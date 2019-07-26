@@ -109,7 +109,7 @@ end
 
 to setup-map
 
-  set lbbd-msoa gis:load-dataset "LBBD_MSOA_HI.shp"
+  set lbbd-msoa gis:load-dataset "data/LBBD_MSOA_HI.shp"
   gis:set-world-envelope (gis:envelope-of lbbd-msoa)
   gis:set-drawing-color white
   gis:draw lbbd-msoa 1
@@ -172,7 +172,7 @@ end
 to setup-Schools
   print "setting up schools"
 
-  set lbbd-schools gis:load-dataset "LBBD_secondary.shp"
+  set lbbd-schools gis:load-dataset "data/LBBD_secondary.shp"
   foreach gis:feature-list-of lbbd-schools [ feature ->
     ask patches gis:intersecting feature [
       set plabel 1
@@ -215,7 +215,7 @@ to setup-Schools
           set y10Parents []
           set y11Parents []
 
-          set places 315
+          set places 95
           set id (count schools - 1)      ;first school has id of zero
           set color (count schools - 1) * 10 + 15  ;first school will be red
                                                      ;set size 0
@@ -341,7 +341,7 @@ to go
     show "Plotting etc"
     check-success
     update-colours
-    plotting
+    ;plotting
 
 ;    if(Export-Summary-Data)
 ;    [
@@ -887,14 +887,16 @@ to add-NewParents
             [
               create-parent
               ask parents-here
-log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
+              [
+                set hhold-income log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
+              ]
               set addedParents addedParents + 1
             ]
           ]
         ]
       ]
       [
-
+        ;do nothing
       ]
     ]
   ]
@@ -936,21 +938,263 @@ end
 
 to allocate-Places
 
+  ask schools
+  [
+    set all-applicants []
+    set all-applicants parents with [child-age = 10 and member? myself rankings and allocated-school = 0]
+    set app-ratio (count all-applicants) / places
+
+    set y7pupils 0 ;re-set number of year 7 pupils for this year of allocations
+    set allocated []
+  ]
+
+
+    ;all schools allocate applicants that ranked them highest first (potentially using distance if there are too many applicants)
+    ;then school allocate applicants that ranked them second (again, potentially using distance if there are too many applicants), third, fourth, etc.
+    ;schools that have remaining places after all ranked preferences have been allocated, allocate remaining places on distance or randomly
+
+    let thisRank 0
+
+    while[thisRank < Number-of-Ranks]
+    [
+      ask schools
+      [
+        if(y7pupils < places)
+        [
+          set applicants parents with [child-age = 10 and item thisRank rankings = myself and allocated-school = 0]   ;add parents to applicants list if they have ranked this school highest
+          if(school-type = "state")
+          [
+            set applicants sort-by [ [?1 ?2] -> distance ?1 < distance ?2 ] applicants  ;sort the list of applicants, closest is first in list NOTE: this sorting changes agentset to a list
+          ]
+
+          if(school-type = "new") [ set applicants sort-by [ [?1 ?2] -> [child-attainment] of ?1 > [child-attainment] of ?2 ] applicants ]  ;sort the list of applicants, highest attainment is first in list NOTE: this sorting changes agentset to a list
+
+          ifelse(length applicants > (places - y7pupils))  ;if there are more applicants than places available at the school, allocate by distance
+          [
+            while [y7pupils < places]  ;while not all places have been allocated
+            [
+              ask first applicants [ set allocated-school myself ]  ;allocate the closest applicant
+              ;ask first applicants [ set allocated-school myself set rankings empty-rankings ]  ;allocate the current 'best' applicant
+              set allocated lput first applicants allocated          ;add this current 'best' applicant to the allocated list
+              set applicants remove-item 0 applicants                ;remove this current 'best' applicant from the applicants list
+              set y7pupils y7pupils + 1                              ;increase number of places allocated by 1
+            ]
+          ]
+
+          ;if there are more places than applicants allocate all applicants a place
+          [
+            foreach applicants
+            [ [?1] ->
+              ask ?1 [set allocated-school myself ]
+              ;ask ? [set allocated-school myself set rankings empty-rankings ]
+              set allocated lput ?1 allocated          ;add this applicant to the allocated list
+            ]
+            set y7pupils (y7pupils + length applicants)
+            ;set applicants []
+          ]
+        ]
+      ]
+
+      set thisRank thisRank + 1
+    ]
+
+
+    ;finally, for schools with unallocated places, allocate unallocated applicants by distance
+    ;first allocated to parents of which this school is closest, then second closest etc.
+    let thisDist 0
+
+    while[thisDist < 9] ;number of schools 9
+    [
+      ask schools with [y7pupils < places]
+      [
+        set applicants parents with [child-age = 10 and allocated-school = 0 and item thisDist distances = myself]
+        set applicants sort-by [ [?1 ?2] -> distance ?1 < distance ?2 ] applicants
+
+        ifelse(length applicants > (places - y7pupils))
+        [
+          while [y7pupils < places]
+          [
+            ask first applicants [ set allocated-school myself ]
+            ;ask first applicants [ set allocated-school myself set rankings empty-rankings ]
+            set allocated lput first applicants allocated          ;add this closest applicant to the allocated list
+            set applicants remove-item 0 applicants                ;remove this closest applicant from the applicants list
+            set y7pupils y7pupils + 1
+          ]
+        ]
+
+        ;if there are more places than applicants allocate all applicants a place
+        [
+          without-interruption
+          [
+            foreach applicants
+            [ [?1] ->
+              ask ?1 [set allocated-school myself ]
+              ;ask ? [set allocated-school myself set rankings empty-rankings ]
+              set allocated lput ?1 allocated          ;add this applicant to the allocated list
+            ]
+            set y7pupils (y7pupils + length applicants)
+            ;set applicants []
+          ]
+        ]
+      ]
+
+      set thisDist thisDist + 1
+    ]
+
+
+
+    ask schools
+    [
+      set all-pupils (length y7parents + length y8parents + length y9parents + length y10parents + length y11parents)
+    ]
+
+    ask parents with [child-age = 10 ]
+    [
+      set allocated-distance distance allocated-school
+    ]
+
+
 end
 
 to calc-catchment-size
+
+  ;calculates mean and max allocated parent distances
+
+  ifelse(ticks > 0) ;initially schools have no parents
+  [
+    ask schools with [school-type = "state"]
+    [
+      let all-parents parents with [ allocated-school = myself ]
+
+      ifelse(not any? all-parents)
+      [
+        set max-distance -1 ;if no places were allocated set a no data value
+        set max-distances lput 0 max-distances ;add the max distance to the list of max distances
+        if(length max-distances > Parent-Memory) [ set max-distances remove-item 0 max-distances ]  ;only keep track of last *Memory* years distances
+
+        set mean-distance -1 ;if no places were allocated set a no data value
+        set mean-distances lput 0 mean-distances ;add the mean distance to the list of mean distances
+        if(length mean-distances > Parent-Memory) [ set mean-distances remove-item 0 mean-distances ]  ;only keep track of last *Memory* years distances
+      ]
+      [
+        set max-distance max [allocated-distance] of all-parents ;if places were allocated find the distance of the furthest allocated parent
+        set max-distances lput max-distance max-distances ;add the max distance to the list of max distances
+        if(length max-distances > Parent-Memory) [ set max-distances remove-item 0 max-distances ]  ;only keep track of last *Memory* years distances
+
+        set mean-distance mean [allocated-distance] of all-parents  ;if places were allocated find the mean distance of allocated parents
+        set mean-distances lput mean-distance mean-distances ;add the mean distance to the list of mean distances
+        if(length mean-distances > Parent-Memory) [ set mean-distances remove-item 0 mean-distances ]  ;only keep track of last *Memory* years distances
+      ]
+    ]
+
+    ask schools with [school-type = "new"]
+    [
+      set max-distances fput (2 * world-width) max-distances
+      set mean-distances fput (2 * world-width) mean-distances
+    ]
+
+  ]
+
+  ;instead just set catchment to larger than the world
+  [
+    ask schools
+    [
+      set max-distances fput (2 * world-width) max-distances
+      set mean-distances fput (2 * world-width) mean-distances
+    ]
+  ]
 
 end
 
 to update-SchoolGCSE
 
+  ;first update child-attainment for this year
+  ask schools
+  [
+    ;show mean-aspiration
+    set-child-attainment y7Parents
+    set-child-attainment y8Parents
+    set-child-attainment y9Parents
+    set-child-attainment y10Parents
+    set-child-attainment y11Parents
+  ]
+
+  ;set mean and max child-attainment
+  ask schools
+  [
+    let myParents (turtle-set y7parents y8parents y9parents y10parents y11parents)
+
+    ifelse(any? myParents)
+    [
+      set mean-aspiration mean [aspiration] of myParents
+      set mean-attainment mean [child-attainment] of myParents
+    ]
+    [
+      set mean-aspiration 0
+      set mean-attainment 0
+    ]
+  ]
+
+  ;only start updating GCSE-score once first cohort of allocated students has reached year 11 (before this y11Parents will be empty)
+  if(ticks > 5)
+  [
+    ask schools
+    [
+      let sumAttainment 0
+
+      if(not empty? y11Parents)
+      [
+        set sumAttainment sum [child-attainment] of turtle-set y11Parents
+        set GCSE-score sumAttainment / length y11Parents
+        if(GCSE-score > 100) [ set GCSE-score 100 ]
+      ]
+    ]
+  ]
+
+  ;GCSE-score is the mean of the last Parent-Memory years, just like max-distances
+  ask schools
+  [
+    set GCSE-scores lput GCSE-score GCSE-scores ;add the GCSE-scores to the list of GCSE-scores
+    if(length GCSE-scores > Parent-Memory) [ set GCSE-scores remove-item 0 GCSE-scores ]  ;only keep track of last *Memory* years distances
+  ]
+
+  ask schools [ set GCSE-score mean GCSE-scores ]
+
 end
 
 to check-success
 
+  ask parents with [child-age = 10 ]
+  [
+    let thisRank 0
+    while[thisRank < Number-of-Ranks]
+    [
+      if(allocated-school = item thisRank rankings) [ set success-by-rank thisRank + 1 ]
+      set thisRank thisRank + 1
+    ]
+
+    if(success-by-rank != -1) [ set success-rank1 0 ]
+    if(success-by-rank = 1) [ set success-rank1 1 ]
+
+    ifelse(aspiration < [GCSE-score] of allocated-school)
+    [ set success-by-aspiration  1 ]
+    [ set success-by-aspiration 0 ]
+  ]
+
 end
 
-to set-patchValue
+to set-child-attainment [ yParents ]
+
+  if(not empty? yParents)
+  [
+    ask turtle-set yParents
+    [
+      if(School-Value-Added = true) [ set child-attainment child-attainment * (1 + [value-added] of myself) ]
+      set child-attainment (child-attainment * (1 - School-Peer-Effect - Parent-Effect)) + ([mean-attainment] of myself * School-Peer-Effect) + (aspiration * Parent-Effect)
+
+      if(child-attainment > 100) [ set child-attainment 100 ]
+    ]
+  ]
 
 end
 
@@ -967,13 +1211,341 @@ end
 ;;----------------------------------
 to update-Colours
 
+  let bestSchool max-one-of schools [GCSE-score]
+  let worstSchool min-one-of schools [GCSE-score]
+
+  ;show parents with specified colours
+  ifelse(Patch-Value = false)
+  [
+    ask patches [ set pcolor black ]
+
+    ask parents
+    [
+      set hidden? false
+
+      if(Parent-Colours = "satisfaction")
+      [
+        ifelse(child-age < 10 or allocated-school = 0)
+        [ set color grey ]
+
+        [
+          if(Success-Type = "ranking")
+          [
+            let dcolor Number-of-Ranks / 3 ;set top third of ranks green, second third yellow, bottom third orange, unranked red
+            if(Number-of-Ranks < 3) [ set dcolor Number-of-Ranks ]
+
+            let thisRank 0
+
+            ;if the allocated-school was ranked
+            ifelse(member? allocated-school rankings)
+            [
+              while[thisRank < length rankings]
+              [
+                if(item thisRank rankings = allocated-school)
+                [
+                  ifelse(thisRank < dcolor) [ set color green ]
+                  [
+                    ifelse(thisRank < dcolor * 2) [ set color yellow ]
+                    [ set color orange ]
+                  ]
+                ]
+                set thisRank thisRank + 1
+              ]
+            ]
+
+            ;if the allocated-school was not ranked set color red
+            [ set color red ]
+          ]
+
+          if(Success-Type = "aspiration")
+          [
+            ifelse(aspiration < [GCSE-score] of allocated-school)
+            [ set color green ]
+            [ set color red ]
+          ]
+
+          if(Success-Type = "attainment")
+          [
+            ifelse(child-attainment >= aspiration)
+            [ set color green ]
+            [ set color red ]
+          ]
+
+        ]
+      ]
+
+
+
+      if(Parent-Colours = "school")
+      [
+        ifelse(child-age < 10 or allocated-school = 0)
+        [ set color grey ]
+        [ set color [id] of allocated-school * 10 + 15 ]
+      ]
+
+      if(Parent-Colours = "aspiration")
+      [
+        ifelse(aspiration = 100)
+        [ set color 19.9 ]
+        [ set color (aspiration / 10) + 10 ]
+      ]
+
+      if(Parent-Colours = "attainment")
+      [
+        ifelse(allocated-school = 0)
+        [ set color grey ]
+        [
+          ifelse(child-attainment = 100)
+          [ set color 29.9 ]
+          [ set color (child-attainment / 10) + 20 ]
+        ]
+      ]
+
+      if(Parent-Colours = "attainment-change")
+      [
+        ifelse(allocated-school = 0)
+        [ set color grey ]
+        [
+          let diffc child-attainment - aspiration
+
+          ifelse(diffc < 0)
+          [
+            ifelse(diffc = -100)
+            [ set color 22 ]
+            [ set color 27 - (diffc / -20) ]
+          ]
+
+          [
+            ifelse(diffc = 100)
+            [ set color 62 ]
+            [ set color 67 - (diffc / 20) ]
+          ]
+
+        ]
+      ]
+
+      if(Parent-Colours = "moved")
+      [
+        ifelse(allocated-school = 0)
+        [ set color grey ]
+        [
+          ifelse(have-moved = true)
+          [ set color green ]
+          [ set color red ]
+        ]
+      ]
+
+      if(Parent-Colours = "best school allocation")
+      [
+        ifelse(allocated-school = 0)
+        [ set color grey ]
+        [
+          ifelse(member? bestSchool rankings)
+          ;ifelse(item 0 rankings = bestSchool)
+          [
+            ifelse(allocated-school = bestSchool)
+            [ set color green ]
+            [ set color red ]
+          ]
+          [ set color grey]
+        ]
+      ]
+
+      if(Parent-Colours = "worst school allocation")
+      [
+        ifelse(allocated-school = 0)
+        [ set color grey ]
+        [
+          ifelse(member? worstSchool rankings)
+          ;ifelse(item 0 rankings = worstSchool)
+          [
+            ifelse(allocated-school = worstSchool)
+            [ set color green ]
+            [ set color red ]
+          ]
+          [ set color grey]
+        ]
+      ]
+
+
+      if(Parent-Colours = "strategy")
+      [
+        ifelse(allocated-school = 0)
+        [ set color grey ]
+        [ set color ((strategy * 10 + 4)) ]
+      ]
+
+      if(Parent-Colours = "age")
+      [
+        if(child-age = 9) [ set color 19 ]
+        if(child-age = 10) [ set color 18 ]
+        if(child-age = 11) [ set color 17 ]
+        if(child-age = 12) [ set color 16 ]
+        if(child-age = 13) [ set color 15 ]
+        if(child-age = 14) [ set color 14 ]
+        if(child-age = 15) [ set color 13 ]
+        if(child-age = 16) [ set color 12 ]
+      ]
+
+      if(Parent-Colours = "allocated-distance")
+      [
+        set color (allocated-distance / 8) + 122
+      ]
+
+    ]
+
+    if(Show-Unallocated = false)
+    [
+      ask parents with [allocated-school = 0] [ set hidden? true ]
+    ]
+
+
+    if(ChildAge = "<9") [ ask parents with [child-age > 8] [ set color grey ] ]
+    if(ChildAge = "9") [ ask parents with [child-age != 9] [ set color grey ] ]
+    if(ChildAge = "10") [ ask parents with [child-age != 10] [ set color grey ] ]
+    if(ChildAge = "11") [ ask parents with [child-age != 11] [ set color grey ] ]
+    if(ChildAge = "12") [ ask parents with [child-age != 12] [ set color grey ] ]
+    if(ChildAge = "13") [ ask parents with [child-age != 13] [ set color grey ] ]
+    if(ChildAge = "14") [ ask parents with [child-age != 14] [ set color grey ] ]
+    if(ChildAge = "15") [ ask parents with [child-age != 15] [ set color grey ] ]
+    if(ChildAge = "16") [ ask parents with [child-age != 16] [ set color grey ] ]
+    if(ChildAge = ">16") [ ask parents with [child-age < 17] [ set color grey ] ]
+    if(ChildAge = "SchoolAge") [ ask parents with [child-age < 10 or child-age > 16 ] [ set color grey ] ]
+
+    if(DistanceClass = "0-10") [ ask parents with [allocated-distance > 10] [ set color grey ] ]
+    if(DistanceClass = "10-20") [ ask parents with [allocated-distance <= 10 or allocated-distance > 20] [ set color grey ] ]
+    if(DistanceClass = "20-30") [ ask parents with [allocated-distance <= 20 or allocated-distance > 30] [ set color grey ] ]
+    if(DistanceClass = "30-40") [ ask parents with [allocated-distance <= 30 or allocated-distance > 40] [ set color grey ] ]
+    if(DistanceClass = "40-50") [ ask parents with [allocated-distance <= 40 or allocated-distance > 50] [ set color grey ] ]
+    if(DistanceClass = "50-60") [ ask parents with [allocated-distance <= 50 or allocated-distance > 60] [ set color grey ] ]
+    if(DistanceClass = ">60") [ ask parents with [allocated-distance <= 60 ] [ set color grey ] ]
+
+    if(AspirationClass = "0-10") [ ask parents with [aspiration > 10] [ set color grey ] ]
+    if(AspirationClass = "10-20") [ ask parents with [aspiration <= 10 or aspiration > 20] [ set color grey ] ]
+    if(AspirationClass = "20-30") [ ask parents with [aspiration <= 20 or aspiration > 30] [ set color grey ] ]
+    if(AspirationClass = "30-40") [ ask parents with [aspiration <= 30 or aspiration > 40] [ set color grey ] ]
+    if(AspirationClass = "40-50") [ ask parents with [aspiration <= 40 or aspiration > 50] [ set color grey ] ]
+    if(AspirationClass = "50-60") [ ask parents with [aspiration <= 50 or aspiration > 60] [ set color grey ] ]
+    if(AspirationClass = "60-70") [ ask parents with [aspiration <= 60 or aspiration > 70] [ set color grey ] ]
+    if(AspirationClass = "70-80") [ ask parents with [aspiration <= 70 or aspiration > 80] [ set color grey ] ]
+    if(AspirationClass = "80-90") [ ask parents with [aspiration <= 80 or aspiration > 90] [ set color grey ] ]
+    if(AspirationClass = "90-100") [ ask parents with [aspiration <= 90 or aspiration > 100] [ set color grey ] ]
+
+  ]
+
+
+
+  ;else don't show parents and show patch value
+  [
+;    ask parents [ set hidden? true ]
+;
+;    ifelse(Parent-Colours = "aspiration")
+;    [
+;      ask patches
+;      [
+;        ifelse(p-aspiration = 100)
+;        [ set pcolor 19.9 ]
+;        [ set pcolor (p-aspiration / 10) + 10 ]
+;      ]
+;    ]
+;
+;    [
+;      ask patches
+;      [
+;        ifelse(house-price = -1)
+;        [ set pcolor black ]
+;        [ set pcolor (house-price / 10) + 10 ]
+;      ]
+;    ]
+  ]
+
+
+
+  ;always show schools
+  let max-ratio max [app-ratio] of schools
+  let max-value-added max [value-added] of schools
+  let min-value-added min [value-added] of schools
+
+  ask schools
+  [
+    if(School-Colours = "id")
+    [
+      set color (id * 10) + 15  ;first school will be red
+    ]
+
+
+    if(School-Colours = "GCSE")
+    [
+      ifelse(GCSE-score = 100)
+      [ set color 49.9 ]
+      [ set color (GCSE-score / 10) + 40 ]
+    ]
+
+    if(School-Colours = "app-ratio")
+    [
+      if(max-ratio != 0)
+      [
+        let scaled-ratio app-ratio / max-ratio
+        ifelse(scaled-ratio = 1)
+        [ set color 59.9 ]
+        [ set color (scaled-ratio * 10) + 50 ]
+      ]
+    ]
+
+
+    if(School-Colours = "value-added")
+    [
+      ifelse(value-added < 0)
+      [
+        let scaled-va value-added / (min-value-added * 2)
+        ifelse(scaled-va = 0.5)
+        [ set color 80.5 ]      ;don't set to 80 b/c unable to see icon on the grid
+        [ set color 85 - (scaled-va * 10) ]
+      ]
+      [
+        let scaled-va value-added / (max-value-added * 2)
+        ifelse(scaled-va = 0.5)
+        [ set color 89.9 ]
+        [ set color (scaled-va * 10) + 85 ]
+      ]
+    ]
+
+    if(Parent-Colours = "best school allocation")
+    [
+      ifelse(id != [id] of bestSchool)
+      [ set color grey ]
+      [ set color yellow ]
+    ]
+
+    if(Parent-Colours = "worst school allocation")
+    [
+      ifelse(id != [id] of worstSchool)
+      [ set color grey ]
+      [ set color yellow ]
+    ]
+
+  ]
+
+
+  if(Single-School)
+  [
+    ask parents
+    [
+      ifelse(allocated-school = 0)
+      [set color grey]
+      [ if([id] of allocated-school != Shown-School) [ set color grey ] ]
+    ]
+
+    ask schools with [id != Shown-School ] [ set color grey ]
+  ]
+
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 209
 10
-964
-766
+933
+735
 -1
 -1
 3.103
@@ -986,10 +1558,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--120
-120
--120
-120
+-115
+115
+-115
+115
 0
 0
 1
@@ -1037,7 +1609,7 @@ run-length
 run-length
 0
 100
-59.0
+100.0
 1
 1
 NIL
@@ -1081,7 +1653,7 @@ BUTTON
 183
 NIL
 go
-NIL
+T
 1
 T
 OBSERVER
@@ -1179,6 +1751,159 @@ Location-Rules
 1
 1
 -1000
+
+SLIDER
+996
+285
+1168
+318
+Parent-Memory
+Parent-Memory
+1
+5
+5.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+996
+334
+1168
+367
+School-Peer-Effect
+School-Peer-Effect
+0
+0.5
+0.25
+0.05
+1
+NIL
+HORIZONTAL
+
+SLIDER
+997
+382
+1169
+415
+Parent-Effect
+Parent-Effect
+0
+0.5
+0.25
+0.05
+1
+NIL
+HORIZONTAL
+
+SWITCH
+1003
+442
+1134
+475
+Patch-Value
+Patch-Value
+1
+1
+-1000
+
+CHOOSER
+1002
+492
+1194
+537
+Parent-Colours
+Parent-Colours
+"satisfaction" "school" "aspiration" "attainment" "attainment-change" "moved" "best school allocation" "worst school allocation" "strategy" "age" "allocated-distance"
+2
+
+CHOOSER
+1003
+552
+1141
+597
+Success-Type
+Success-Type
+"ranking" "aspiration" "attainment"
+2
+
+SWITCH
+1003
+612
+1172
+645
+Show-Unallocated
+Show-Unallocated
+1
+1
+-1000
+
+CHOOSER
+1003
+652
+1141
+697
+ChildAge
+ChildAge
+"All" "SchoolAge" ">16" "<9" "9" "10" "11" "12" "13" "14" "15" "16"
+0
+
+CHOOSER
+1003
+704
+1141
+749
+DistanceClass
+DistanceClass
+"All" "0-10" "10-20" "20-30" "30-40" "40-50" "50-60" ">60"
+0
+
+CHOOSER
+1003
+757
+1141
+802
+AspirationClass
+AspirationClass
+"All" "0-10" "10-20" "20-30" "30-40" "40-50" "50-60" "60-70" "70-80" "80-90" "90-100"
+0
+
+CHOOSER
+1002
+812
+1140
+857
+School-Colours
+School-Colours
+"id" "GCSE" "app-ratio" "value-added"
+0
+
+SWITCH
+1003
+864
+1145
+897
+Single-School
+Single-School
+1
+1
+-1000
+
+SLIDER
+816
+865
+988
+898
+Shown-School
+Shown-School
+0
+10
+10.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
