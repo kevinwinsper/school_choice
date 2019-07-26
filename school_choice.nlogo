@@ -135,7 +135,11 @@ to setup-Parents
               set shape "circle"
               facexy 0 0
 
-              set aspiration random-normal 100 20
+              set aspiration -1
+              while [aspiration < 0 or aspiration > 100]
+              [
+                set aspiration random-normal 50 20
+              ]
               set child-attainment aspiration
 
               set hhold-income log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
@@ -911,7 +915,11 @@ to create-parent
        set shape "circle"
        facexy 0 0
 
-       set aspiration random-normal 100 20
+       set aspiration -1
+       while [aspiration < 0 or aspiration > 100]
+       [
+         set aspiration random-normal 50 20
+       ]
        set child-attainment aspiration
 
        ;set hhold-income log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
@@ -1003,7 +1011,7 @@ to allocate-Places
     ;first allocated to parents of which this school is closest, then second closest etc.
     let thisDist 0
 
-    while[thisDist < 9] ;number of schools 9
+    while[thisDist < 10] ;number of schools 10
     [
       ask schools with [y7pupils < places]
       [
