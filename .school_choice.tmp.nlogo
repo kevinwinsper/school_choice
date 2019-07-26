@@ -887,9 +887,7 @@ to add-NewParents
             [
               create-parent
               ask parents-here
-              [
-                set hhold-income log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
-              ]
+log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
               set addedParents addedParents + 1
             ]
           ]
