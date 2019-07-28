@@ -120,13 +120,66 @@ end
 to setup-Parents
   print "setting up parents"
 
-  foreach gis:feature-list-of lbbd-msoa [ feature ->
+;  foreach gis:feature-list-of lbbd-msoa [ feature ->
+;    let addedParents 0
+;    while [ addedParents < 300]
+;    [
+;      ask one-of (patches gis:intersecting feature)
+;      [
+;        if gis:contained-by? self feature [
+;          if(not any? turtles-here) ; make sure parents do not occupy school patch
+;          [
+;            sprout-parents 1
+;            [
+;              set color grey
+;              set size 1
+;              set shape "circle"
+;              facexy 0 0
+;
+;              set aspiration -1
+;              while [aspiration < 0 or aspiration > 100]
+;              [
+;                set aspiration random-normal 50 20
+;              ]
+;              set child-attainment aspiration
+;
+;              set hhold-income log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
+;
+;              set child-age (floor ((addedParents + 1) / (300 / 7))) + 9
+;
+;              set allocated-school 0
+;
+;              set have-moved false
+;              set want-to-move true
+;              set initialHome myself
+;              set newHome nobody
+;
+;              set rankings []
+;
+;              set success-by-rank -1
+;              set success-rank1 -1
+;              set success-by-aspiration -1
+;              set strategy -1
+;            ]
+;            set addedParents addedParents + 1
+;          ]
+;        ]
+;      ]
+;    ]
+;    if(any? parents with [child-age = 16])
+;    [
+;      ask parents with [child-age = 16] [ set child-age 9 ]
+;    ]
+;  ]
+
+  ;foreach gis:feature-list-of lbbd-msoa [ feature ->
     let addedParents 0
-    while [ addedParents < 300]
+    while [ addedParents < 6600]
     [
-      ask one-of (patches gis:intersecting feature)
+    ask one-of patches with [within-lbbd = true]
       [
-        if gis:contained-by? self feature [
+        ;if gis:contained-by? self feature [
+          let mean-income [mean-hhold-income] of self
           if(not any? turtles-here) ; make sure parents do not occupy school patch
           [
             sprout-parents 1
@@ -143,9 +196,9 @@ to setup-Parents
               ]
               set child-attainment aspiration
 
-              set hhold-income log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
-
-              set child-age (floor ((addedParents + 1) / (300 / 7))) + 9
+              ;set hhold-income log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
+              set hhold-income log-normal read-from-string mean-income 4750
+              set child-age (floor ((addedParents + 1) / (6600 / 7))) + 9
 
               set allocated-school 0
 
@@ -163,14 +216,14 @@ to setup-Parents
             ]
             set addedParents addedParents + 1
           ]
-        ]
+        ;]
       ]
     ]
     if(any? parents with [child-age = 16])
     [
       ask parents with [child-age = 16] [ set child-age 9 ]
     ]
-  ]
+  ;]
 
 end
 
@@ -240,18 +293,17 @@ end
 
 to setup-Patches
 
-  ask patches [ set within-lbbd False ]
+  ask patches [ set within-lbbd false ]
   foreach gis:feature-list-of lbbd-msoa [ feature ->
     ask patches gis:intersecting feature [
-      if gis:contained-by? self feature [
-        set within-lbbd True
+      ;if gis:contained-by? self feature [
+        set within-lbbd true
         set centroid gis:location-of gis:centroid-of feature
         set msoa gis:property-value feature "MSOA11CD"
         set mean-house-price gis:property-value feature "HPRICE"
         set house-price log-normal read-from-string mean-house-price 4000
         set mean-hhold-income gis:property-value feature "HHOLDINC"
-;        ]
-      ]
+      ;]
     ]
   ]
 
@@ -917,16 +969,16 @@ to add-NewParents
     [
       ask one-of patches with [within-lbbd = true]
       [
-         if(not any? turtles-here)
-         [
+        if(not any? turtles-here)
+        [
           let mean-income [mean-hhold-income] of self
-           create-parent
-           ask parents-here
-           [
-             set hhold-income log-normal read-from-string mean-income 4750
-           ]
-           set addedParents addedParents + 1
-         ]
+          create-parent
+          ask parents-here
+          [
+            set hhold-income log-normal read-from-string mean-income 4750
+          ]
+          set addedParents addedParents + 1
+        ]
       ]
     ]
 
@@ -959,6 +1011,7 @@ to create-parent
    sprout-parents 1
      [
        set color grey
+       if(Show-Unallocated = false) [ set hidden? true ]
        set size 1
        set shape "circle"
        facexy 0 0
@@ -1600,11 +1653,11 @@ end
 GRAPHICS-WINDOW
 209
 10
-964
-766
+796
+598
 -1
 -1
-3.103
+4.42
 1
 10
 1
@@ -1614,10 +1667,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--120
-120
--120
-120
+-65
+65
+-65
+65
 0
 0
 1
@@ -1767,26 +1820,26 @@ SWITCH
 646
 Move-Closest
 Move-Closest
-1
+0
 1
 -1000
 
 SWITCH
-1094
-103
-1236
-136
+19
+668
+161
+701
 Move-Closest
 Move-Closest
-1
+0
 1
 -1000
 
 SLIDER
-1093
-149
-1266
-182
+18
+714
+191
+747
 Price-Income-Ratio
 Price-Income-Ratio
 5
@@ -1798,10 +1851,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-1094
-203
-1244
-236
+19
+768
+169
+801
 Location-Rules
 Location-Rules
 1
@@ -1809,10 +1862,10 @@ Location-Rules
 -1000
 
 SLIDER
-1094
-251
-1266
-284
+19
+816
+191
+849
 Parent-Memory
 Parent-Memory
 1
@@ -1824,10 +1877,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-1094
-300
-1266
-333
+19
+865
+191
+898
 School-Peer-Effect
 School-Peer-Effect
 0
@@ -1839,10 +1892,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-1095
-348
-1267
-381
+20
+913
+192
+946
 Parent-Effect
 Parent-Effect
 0
@@ -1854,10 +1907,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-1130
-407
-1261
-440
+23
+971
+154
+1004
 Patch-Value
 Patch-Value
 1
@@ -1865,30 +1918,30 @@ Patch-Value
 -1000
 
 CHOOSER
-1100
-458
-1292
-503
+25
+1023
+217
+1068
 Parent-Colours
 Parent-Colours
 "satisfaction" "school" "aspiration" "attainment" "attainment-change" "moved" "best school allocation" "worst school allocation" "strategy" "age" "allocated-distance"
 2
 
 CHOOSER
-1101
-518
-1239
-563
+26
+1083
+164
+1128
 Success-Type
 Success-Type
 "ranking" "aspiration" "attainment"
 2
 
 SWITCH
-1101
-578
-1270
-611
+26
+1143
+195
+1176
 Show-Unallocated
 Show-Unallocated
 1
@@ -1896,50 +1949,50 @@ Show-Unallocated
 -1000
 
 CHOOSER
-1101
-618
-1239
-663
+26
+1183
+164
+1228
 ChildAge
 ChildAge
 "All" "SchoolAge" ">16" "<9" "9" "10" "11" "12" "13" "14" "15" "16"
 0
 
 CHOOSER
-1101
-670
-1239
-715
+26
+1235
+164
+1280
 DistanceClass
 DistanceClass
 "All" "0-10" "10-20" "20-30" "30-40" "40-50" "50-60" ">60"
 0
 
 CHOOSER
-1101
-723
-1239
-768
+26
+1288
+164
+1333
 AspirationClass
 AspirationClass
 "All" "0-10" "10-20" "20-30" "30-40" "40-50" "50-60" "60-70" "70-80" "80-90" "90-100"
 0
 
 CHOOSER
-1100
-778
-1238
-823
+25
+1343
+163
+1388
 School-Colours
 School-Colours
 "id" "GCSE" "app-ratio" "value-added"
 0
 
 SWITCH
-1101
-830
-1243
-863
+26
+1395
+168
+1428
 Single-School
 Single-School
 1
@@ -1947,10 +2000,10 @@ Single-School
 -1000
 
 SLIDER
-816
-865
-988
-898
+27
+1439
+199
+1472
 Shown-School
 Shown-School
 0
