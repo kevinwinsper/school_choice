@@ -174,7 +174,7 @@ to setup-Parents
 
   ;foreach gis:feature-list-of lbbd-msoa [ feature ->
     let addedParents 0
-    while [ addedParents < 6600]
+    while [ addedParents < 7000]
     [
     ask one-of patches with [within-lbbd = true]
       [
@@ -198,7 +198,7 @@ to setup-Parents
 
               ;set hhold-income log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
               set hhold-income log-normal read-from-string mean-income 4750
-              set child-age (floor ((addedParents + 1) / (6600 / 7))) + 9
+              set child-age (floor ((addedParents + 1) / (7000 / 7))) + 9
 
               set allocated-school 0
 
@@ -273,7 +273,7 @@ to setup-Schools
           set y10Parents []
           set y11Parents []
 
-          set places 95
+          set places 100
           set id (count schools - 1)      ;first school has id of zero
           set color (count schools - 1) * 10 + 15  ;first school will be red
                                                      ;set size 0
@@ -399,7 +399,7 @@ to go
     show "Plotting etc"
     check-success
     update-colours
-    ;plotting
+    plotting
 
 ;    if(Export-Summary-Data)
 ;    [
@@ -961,7 +961,7 @@ to add-NewParents
 
   let addedParents 0
 
-  while [addedParents < 300 / 7 * 22]
+  while [addedParents < 7000 / 7]
   [
     let sprouting-patch nobody
 
@@ -984,21 +984,27 @@ to add-NewParents
 
     ;otherwise only allow parents to move to patches with patchValue lower than their aspiration
     [
-;      ask patch 0 0 [ create-parent ]
+;      foreach gis:feature-list-of lbbd-msoa [ feature ->
+;        let addedParentsWithinMSOA 0
+;        while [ addedParentsWithinMSOA < 1000 / 22]
+;        [
+;          ask patch -68 68 [ create-parent ]
+;          let mean-income read-from-string gis:property-value feature "HHOLDINC"
+;          ask parents-on patch -68 68
+;          [
+;            set hhold-income log-normal mean-income 4750
+;            let newPatch patch-here
+;            let houseValue-max mean-income * Price-Income-Ratio
+;            set newPatch max-one-of patches with [not any? turtles-here and within-lbbd = true and house-price < houseValue-max] [house-price]
+;            if(newPatch = nobody) [set newPatch min-one-of patches with [not any? turtles-here and within-lbbd = true] [house-price]]
+;            move-to newPatch
+;            set initialHome newPatch
+;          ]
+;          set addedParentsWithinMSOA addedParentsWithinMSOA + 1
+;          set addedParents addedParents + 1
+;        ]
 ;
-;      ask parents-on patch 0 0
-;      [
-;        let newPatch patch-here
-;        let myAspiration aspiration
-;
-;        set newPatch max-one-of patches with [not any? turtles-here and patchValue < myAspiration ] [patchValue]
-;
-;        if(newPatch = nobody) [set newPatch min-one-of patches with [not any? turtles-here ] [patchValue]] ;if there are no patches with patchVAlue < aspiration, move to patch available with minimum patchValue
-;        move-to newPatch
-;        set initialHome newPatch
 ;      ]
-;
-;      set addedParents addedParents + 1
 
     ]
 
@@ -1308,14 +1314,6 @@ to set-child-attainment [ yParents ]
 end
 
 ;;----------------------------------
-;;PLOTTING
-;;----------------------------------
-
-to plotting
-
-end
-
-;;----------------------------------
 ;;DISPLAY
 ;;----------------------------------
 to update-Colours
@@ -1397,6 +1395,13 @@ to update-Colours
         ifelse(aspiration = 100)
         [ set color 19.9 ]
         [ set color (aspiration / 10) + 10 ]
+      ]
+
+      if(Parent-Colours = "household income")
+      [
+        ifelse(hhold-income = 100)
+        [ set color 19.9 ]
+        [ set color (hhold-income / 6300) + 10 ]
       ]
 
       if(Parent-Colours = "attainment")
@@ -1649,15 +1654,214 @@ to update-Colours
   ]
 
 end
+
+;;----------------------------------
+;;PLOTTING
+;;----------------------------------
+
+to plotting
+
+;  do-line-plots
+  do-bar-plots
+  do-scatter-plots
+
+end
+
+to do-bar-plots
+
+
+  set-current-plot "Application-Ratio"
+  clear-plot
+  set-current-plot-pen "s"
+  set-plot-pen-color black
+
+  ifelse(Ordered-Plots = false)
+  [ ask-concurrent schools [ plotxy id app-ratio ] ]
+  [
+    let tempSchools sort-by [ [?1 ?2] -> [app-ratio] of ?1 > [app-ratio] of ?2 ] schools
+    foreach tempSchools [ [?1] -> plot [app-ratio] of ?1 ]
+  ]
+
+
+
+
+  set-current-plot "GCSE-scores"
+  clear-plot
+  set-current-plot-pen "s"
+
+  ifelse(Ordered-Plots = false)
+  [ ask-concurrent schools [ plotxy id GCSE-score ]  ]
+  [
+    let tempSchools sort-by [ [?1 ?2] -> [GCSE-score] of ?1 > [GCSE-score] of ?2 ] schools
+    foreach tempSchools [ [?1] -> plot [GCSE-score] of ?1 ]
+  ]
+
+;  set-current-plot "Max-Distance"
+;  clear-plot
+;  set-current-plot-pen "s"
+;
+;  ifelse(Ordered-Plots = false)
+;  [ ask-concurrent schools [ plotxy id max-distance ] ]
+;  [
+;    let tempSchools sort-by [ [max-distance] of ?1 > [max-distance] of ?2 ] schools
+;    foreach tempSchools [ plot [max-distance] of ? ]
+;  ]
+;
+ ;set-current-plot "BestSchool-ranks"
+ ;clear-plot
+ ;set-current-plot-pen "default"
+
+ ;ask max-one-of schools [GCSE-score]
+ ;[
+ ;  let sumRanks 0
+ ;  let thisRank 0
+ ;  let ranks 0
+
+ ;  while[thisRank < Number-of-Ranks]
+ ;  [
+ ;    set ranks 0
+
+ ;    foreach allocated
+ ;    [
+ ;      if([item thisRank rankings] of ? = self)
+ ;      [
+ ;        set ranks ranks + 1
+ ;        set sumRanks sumRanks + 1
+ ;        ;ask ? [show rankings]
+ ;      ]
+ ;    ]
+
+ ;    ;show ranks
+ ;    ;show sumRanks
+ ;    plotxy thisRank ranks
+ ;    set thisRank thisRank + 1
+ ;  ]
+
+ ;  ;show length allocated
+ ;  ;plot unranked
+ ;  plotxy thisRank (length allocated) - sumRanks
+ ;]
+
+
+
+ ;set-current-plot "WorstSchool-ranks"
+ ;clear-plot
+ ;set-current-plot-pen "default"
+
+ ;ask min-one-of schools [GCSE-score]
+ ;[
+ ;  let sumRanks 0
+ ;  let thisRank 0
+
+ ;  while[thisRank < Number-of-Ranks]
+ ;  [
+ ;    let ranks 0
+
+ ;    foreach allocated
+ ;    [
+ ;      if([item thisRank rankings] of ? = self)
+ ;      [
+ ;        set ranks ranks + 1
+ ;        set sumRanks sumRanks + 1
+ ;        ;ask ? [show rankings]
+ ;      ]
+ ;    ]
+
+ ;    plotxy thisRank ranks
+ ;    set thisRank thisRank + 1
+ ;  ]
+
+ ;  ;plot unranked
+ ;  plotxy thisRank length allocated - sumRanks
+ ;]
+
+
+  ;set-current-plot "aspiration-distribution"
+  ;clear-plot
+  ;set-current-plot-pen "default"
+  ;histogram [aspiration] of parents with [child-age >= 10 and child-age <= 15 ]
+
+end
+
+
+
+to do-scatter-plots
+
+
+  set-current-plot "MaxDistance-GCSE"
+  clear-plot
+  set-current-plot-pen "max"
+  ask schools
+  [
+    ;set-plot-pen-color (id * 10) + 15
+    set-plot-pen-color black
+    plotxy GCSE-score max-distance
+  ]
+
+   set-current-plot "MaxDistance-App"
+  clear-plot
+  set-current-plot-pen "default"
+  ask schools
+  [
+    ;set-plot-pen-color (id * 10) + 15
+    set-plot-pen-color black
+    plotxy app-ratio max-distance
+  ]
+
+  ;set-current-plot "MeanDistance-GCSE"
+  ;clear-plot
+  ;set-current-plot-pen "default"
+  ;ask schools
+  ;[
+  ;  set-plot-pen-color (id * 10) + 15
+  ;  plotxy GCSE-score mean-distance
+  ;]
+
+  ;set-current-plot "MeanDistance-App"
+  ;clear-plot
+  ;set-current-plot-pen "default"
+  ;ask schools
+  ;[
+  ;  set-plot-pen-color (id * 10) + 15
+  ;  plotxy app-ratio mean-distance
+  ;]
+
+  set-current-plot "AppRatio-GCSE"
+  clear-plot
+  set-current-plot-pen "default"
+  ask schools
+  [
+    ;set-plot-pen-color (id * 10) + 15
+    set-plot-pen-color black
+    plotxy GCSE-score app-ratio
+  ]
+
+  if(School-Value-Added)
+  [
+    set-current-plot "AppRatio-ValueAdded"
+    clear-plot
+    set-current-plot-pen "default"
+    ask schools
+    [
+      ;set-plot-pen-color (id * 10) + 15
+      set-plot-pen-color black
+      plotxy app-ratio value-added
+    ]
+  ]
+
+end
+;;----------------------------------
+;;END PLOTTING
+;;----------------------------------
 @#$#@#$#@
 GRAPHICS-WINDOW
-209
+190
 10
-796
-598
+739
+560
 -1
 -1
-4.42
+3.95
 1
 10
 1
@@ -1667,10 +1871,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--65
-65
--65
-65
+-68
+68
+-68
+68
 0
 0
 1
@@ -1678,10 +1882,10 @@ ticks
 30.0
 
 BUTTON
-20
-150
-93
-183
+18
+18
+91
+51
 setup
 setup
 NIL
@@ -1695,29 +1899,29 @@ NIL
 1
 
 SLIDER
-20
-197
-112
-230
+18
+65
+110
+98
 seed
 seed
 0
 1000
-1000.0
+494.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-20
-245
-118
-278
+18
+113
+116
+146
 run-length
 run-length
 0
-100
+200
 100.0
 1
 1
@@ -1725,30 +1929,30 @@ NIL
 HORIZONTAL
 
 CHOOSER
-20
-293
-159
-338
+18
+161
+157
+206
 Initial-School-GCSE-Distribution
 Initial-School-GCSE-Distribution
 "uniform" "normal" "negative-exponential"
-0
+1
 
 CHOOSER
-19
-353
-159
-398
+17
+221
+157
+266
 School-Value-Added-Distribution
 School-Value-Added-Distribution
 "uniform" "normal"
-0
+1
 
 SWITCH
-19
-416
-161
-449
+17
+284
+159
+317
 School-Value-Added
 School-Value-Added
 0
@@ -1756,10 +1960,10 @@ School-Value-Added
 -1000
 
 BUTTON
-117
-150
-180
-183
+115
+18
+178
+51
 NIL
 go
 T
@@ -1773,10 +1977,10 @@ NIL
 1
 
 SLIDER
-17
-471
-191
-504
+15
+339
+189
+372
 Avoided-Threshold
 Avoided-Threshold
 0
@@ -1788,47 +1992,36 @@ NIL
 HORIZONTAL
 
 SWITCH
-18
-519
-181
-552
+16
+387
+179
+420
 Avoid-Schools
 Avoid-Schools
-1
+0
 1
 -1000
 
 SLIDER
-18
-565
-190
-598
+16
+433
+188
+466
 Number-of-Ranks
 Number-of-Ranks
 2
 6
-6.0
+5.0
 1
 1
 NIL
 HORIZONTAL
 
 SWITCH
-18
-613
-160
-646
-Move-Closest
-Move-Closest
-0
-1
--1000
-
-SWITCH
-19
-668
-161
-701
+16
+481
+158
+514
 Move-Closest
 Move-Closest
 0
@@ -1836,25 +2029,25 @@ Move-Closest
 -1000
 
 SLIDER
-18
-714
-191
-747
+16
+582
+189
+615
 Price-Income-Ratio
 Price-Income-Ratio
 5
 9
-6.0
+8.0
 0.5
 1
 NIL
 HORIZONTAL
 
 SWITCH
-19
-768
-169
-801
+17
+636
+167
+669
 Location-Rules
 Location-Rules
 1
@@ -1862,10 +2055,10 @@ Location-Rules
 -1000
 
 SLIDER
-19
-816
-191
-849
+17
+684
+189
+717
 Parent-Memory
 Parent-Memory
 1
@@ -1877,40 +2070,40 @@ NIL
 HORIZONTAL
 
 SLIDER
-19
-865
-191
-898
+17
+733
+189
+766
 School-Peer-Effect
 School-Peer-Effect
 0
 0.5
-0.25
+0.5
 0.05
 1
 NIL
 HORIZONTAL
 
 SLIDER
-20
-913
-192
-946
+18
+781
+190
+814
 Parent-Effect
 Parent-Effect
 0
 0.5
-0.25
+0.5
 0.05
 1
 NIL
 HORIZONTAL
 
 SWITCH
-23
-971
-154
-1004
+21
+839
+152
+872
 Patch-Value
 Patch-Value
 1
@@ -1918,30 +2111,30 @@ Patch-Value
 -1000
 
 CHOOSER
-25
-1023
-217
-1068
+23
+891
+215
+936
 Parent-Colours
 Parent-Colours
-"satisfaction" "school" "aspiration" "attainment" "attainment-change" "moved" "best school allocation" "worst school allocation" "strategy" "age" "allocated-distance"
-2
+"satisfaction" "school" "aspiration" "attainment" "attainment-change" "moved" "best school allocation" "worst school allocation" "strategy" "age" "allocated-distance" "household income"
+11
 
 CHOOSER
-26
-1083
-164
-1128
+24
+951
+162
+996
 Success-Type
 Success-Type
 "ranking" "aspiration" "attainment"
 2
 
 SWITCH
-26
-1143
-195
-1176
+24
+1011
+193
+1044
 Show-Unallocated
 Show-Unallocated
 1
@@ -1949,50 +2142,50 @@ Show-Unallocated
 -1000
 
 CHOOSER
-26
-1183
-164
-1228
+24
+1051
+162
+1096
 ChildAge
 ChildAge
 "All" "SchoolAge" ">16" "<9" "9" "10" "11" "12" "13" "14" "15" "16"
 0
 
 CHOOSER
-26
-1235
-164
-1280
+24
+1103
+162
+1148
 DistanceClass
 DistanceClass
 "All" "0-10" "10-20" "20-30" "30-40" "40-50" "50-60" ">60"
 0
 
 CHOOSER
-26
-1288
-164
-1333
+24
+1156
+162
+1201
 AspirationClass
 AspirationClass
 "All" "0-10" "10-20" "20-30" "30-40" "40-50" "50-60" "60-70" "70-80" "80-90" "90-100"
 0
 
 CHOOSER
-25
-1343
-163
-1388
+23
+1211
+161
+1256
 School-Colours
 School-Colours
 "id" "GCSE" "app-ratio" "value-added"
-0
+2
 
 SWITCH
-26
-1395
-168
-1428
+24
+1263
+166
+1296
 Single-School
 Single-School
 1
@@ -2000,10 +2193,10 @@ Single-School
 -1000
 
 SLIDER
-27
-1439
-199
-1472
+25
+1307
+197
+1340
 Shown-School
 Shown-School
 0
@@ -2013,6 +2206,170 @@ Shown-School
 1
 NIL
 HORIZONTAL
+
+SWITCH
+25
+1354
+171
+1387
+Ordered-Plots
+Ordered-Plots
+1
+1
+-1000
+
+PLOT
+809
+10
+1008
+165
+MaxDistance-GCSE
+GCSE-score
+max-distance
+0.0
+100.0
+0.0
+100.0
+true
+false
+"" ""
+PENS
+"max" 1.0 2 -2674135 true "" ""
+"mean" 1.0 2 -16777216 true "" ""
+
+PLOT
+809
+173
+1009
+323
+AppRatio-GCSE
+GCSE-score
+app-ratio
+0.0
+100.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 2 -16777216 true "" ""
+
+PLOT
+810
+334
+1010
+484
+GCSE-scores
+NIL
+NIL
+0.0
+10.0
+25.0
+100.0
+true
+false
+"" ""
+PENS
+"s" 1.0 1 -16777216 true "" ""
+
+PLOT
+1025
+10
+1225
+160
+MaxDistance-App
+AppRatio
+MaxDist
+0.0
+10.0
+0.0
+100.0
+true
+false
+"" ""
+PENS
+"default" 1.0 2 -16777216 true "" ""
+
+PLOT
+1025
+173
+1225
+323
+AppRatio-ValueAdded
+AppRatio
+ValueAdded
+0.0
+10.0
+-0.1
+0.1
+true
+false
+"" ""
+PENS
+"default" 1.0 2 -16777216 true "" ""
+
+PLOT
+1027
+334
+1227
+484
+Application-Ratio
+NIL
+NIL
+0.0
+10.0
+0.0
+1.0
+true
+false
+"" ""
+PENS
+"s" 1.0 1 -16777216 true "" ""
+
+MONITOR
+810
+513
+903
+566
+Mean GCSE
+mean [GCSE-score] of schools
+1
+1
+13
+
+MONITOR
+919
+512
+1017
+565
+Range GCSE
+(max [GCSE-score] of schools) - (min [GCSE-score] of schools)
+1
+1
+13
+
+MONITOR
+1033
+513
+1131
+566
+Mean App-ratio
+mean [app-ratio] of schools
+1
+1
+13
+
+MONITOR
+1139
+512
+1252
+565
+Range App-ratio
+(max [app-ratio] of schools) - (min [app-ratio] of schools)
+1
+1
+13
 
 @#$#@#$#@
 ## WHAT IS IT?
