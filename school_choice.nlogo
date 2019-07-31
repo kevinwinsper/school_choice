@@ -189,6 +189,9 @@ to setup-Parents
               set shape "circle"
               facexy 0 0
 
+              ;set hhold-income log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
+              set hhold-income log-normal read-from-string mean-income 4750
+
               set aspiration -1
               while [aspiration < 0 or aspiration > 100]
               [
@@ -196,8 +199,6 @@ to setup-Parents
               ]
               set child-attainment aspiration
 
-              ;set hhold-income log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
-              set hhold-income log-normal read-from-string mean-income 4750
               set child-age (floor ((addedParents + 1) / (7000 / 7))) + 9
 
               set allocated-school 0
@@ -273,7 +274,7 @@ to setup-Schools
           set y10Parents []
           set y11Parents []
 
-          set places 100
+          set places 105
           set id (count schools - 1)      ;first school has id of zero
           set color (count schools - 1) * 10 + 15  ;first school will be red
                                                      ;set size 0
@@ -932,33 +933,6 @@ end
 
 to add-NewParents
 
-;  foreach gis:feature-list-of lbbd-msoa [ feature ->
-;    let addedParents 0
-;    while [ addedParents < 300 / 7]
-;    [
-;      ifelse(Location-Rules = false)  ;if new parents can be located randomly on the grid
-;      [
-;        ask one-of (patches gis:intersecting feature)
-;        [
-;          if gis:contained-by? self feature [
-;            if(not any? turtles-here) ; make sure parents do not occupy school patch
-;            [
-;              create-parent
-;              ask parents-here
-;              [
-;                set hhold-income log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
-;              ]
-;              set addedParents addedParents + 1
-;            ]
-;          ]
-;        ]
-;      ]
-;      [
-;        ;do nothing
-;      ]
-;    ]
-;  ]
-
   let addedParents 0
 
   while [addedParents < 7000 / 7]
@@ -976,6 +950,11 @@ to add-NewParents
           ask parents-here
           [
             set hhold-income log-normal read-from-string mean-income 4750
+            while [aspiration < 0 or aspiration > 100]
+              [
+                set aspiration random-normal 50 20
+              ]
+            set child-attainment aspiration
           ]
           set addedParents addedParents + 1
         ]
@@ -984,27 +963,36 @@ to add-NewParents
 
     ;otherwise only allow parents to move to patches with patchValue lower than their aspiration
     [
-;      foreach gis:feature-list-of lbbd-msoa [ feature ->
-;        let addedParentsWithinMSOA 0
-;        while [ addedParentsWithinMSOA < 1000 / 22]
-;        [
-;          ask patch -68 68 [ create-parent ]
-;          let mean-income read-from-string gis:property-value feature "HHOLDINC"
-;          ask parents-on patch -68 68
-;          [
-;            set hhold-income log-normal mean-income 4750
-;            let newPatch patch-here
-;            let houseValue-max mean-income * Price-Income-Ratio
-;            set newPatch max-one-of patches with [not any? turtles-here and within-lbbd = true and house-price < houseValue-max] [house-price]
-;            if(newPatch = nobody) [set newPatch min-one-of patches with [not any? turtles-here and within-lbbd = true] [house-price]]
-;            move-to newPatch
-;            set initialHome newPatch
-;          ]
-;          set addedParentsWithinMSOA addedParentsWithinMSOA + 1
-;          set addedParents addedParents + 1
-;        ]
-;
-;      ]
+      foreach gis:feature-list-of lbbd-msoa [ feature ->
+        let addedParentsWithinMSOA 0
+        while [ addedParentsWithinMSOA < 1000 / 22]
+        [
+          ask patch 0 0 [ create-parent ]
+          let mean-income read-from-string gis:property-value feature "HHOLDINC"
+          ask parents-on patch 0 0
+          [
+            while [aspiration < 0 or aspiration > 100]
+              [
+                set aspiration random-normal 50 20
+              ]
+            set child-attainment aspiration
+
+            set hhold-income log-normal mean-income 4750
+            let newPatch patch-here
+            let houseValue-max mean-income * Price-Income-Ratio
+            set newPatch max-one-of patches with [not any? turtles-here and within-lbbd = true and house-price < houseValue-max] [house-price]
+            if(newPatch = nobody) [
+              set newPatch min-one-of patches with [not any? turtles-here and within-lbbd = true] [house-price]
+              show "failed to find house for new parent"
+            ]
+            move-to newPatch
+            set initialHome newPatch
+          ]
+          set addedParentsWithinMSOA addedParentsWithinMSOA + 1
+          set addedParents addedParents + 1
+        ]
+
+      ]
 
     ]
 
@@ -1023,10 +1011,10 @@ to create-parent
        facexy 0 0
 
        set aspiration -1
-       while [aspiration < 0 or aspiration > 100]
-       [
-         set aspiration random-normal 50 20
-       ]
+;       while [aspiration < 0 or aspiration > 100]
+;       [
+;         set aspiration random-normal 50 20
+;       ]
        set child-attainment aspiration
 
        ;set hhold-income log-normal read-from-string gis:property-value feature "HHOLDINC" 4750
@@ -1922,7 +1910,7 @@ run-length
 run-length
 0
 200
-100.0
+200.0
 1
 1
 NIL
@@ -1936,7 +1924,7 @@ CHOOSER
 Initial-School-GCSE-Distribution
 Initial-School-GCSE-Distribution
 "uniform" "normal" "negative-exponential"
-1
+0
 
 CHOOSER
 17
@@ -2011,7 +1999,7 @@ Number-of-Ranks
 Number-of-Ranks
 2
 6
-5.0
+4.0
 1
 1
 NIL
@@ -2029,25 +2017,25 @@ Move-Closest
 -1000
 
 SLIDER
-16
-582
-189
-615
+13
+530
+186
+563
 Price-Income-Ratio
 Price-Income-Ratio
 4
 9
-6.5
+6.0
 0.5
 1
 NIL
 HORIZONTAL
 
 SWITCH
-17
-636
-167
-669
+14
+580
+164
+613
 Location-Rules
 Location-Rules
 1
@@ -2078,7 +2066,7 @@ School-Peer-Effect
 School-Peer-Effect
 0
 0.5
-0.5
+0.25
 0.05
 1
 NIL
@@ -2093,7 +2081,7 @@ Parent-Effect
 Parent-Effect
 0
 0.5
-0.5
+0.25
 0.05
 1
 NIL
@@ -2118,7 +2106,7 @@ CHOOSER
 Parent-Colours
 Parent-Colours
 "satisfaction" "school" "aspiration" "attainment" "attainment-change" "moved" "best school allocation" "worst school allocation" "strategy" "age" "allocated-distance" "household income"
-11
+0
 
 CHOOSER
 24
@@ -2128,7 +2116,7 @@ CHOOSER
 Success-Type
 Success-Type
 "ranking" "aspiration" "attainment"
-2
+1
 
 SWITCH
 24
@@ -2179,7 +2167,7 @@ CHOOSER
 School-Colours
 School-Colours
 "id" "GCSE" "app-ratio" "value-added"
-2
+1
 
 SWITCH
 24
