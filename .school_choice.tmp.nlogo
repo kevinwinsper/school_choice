@@ -250,7 +250,7 @@ to setup-Schools
             while [value-added < -1 or value-added > 1 ]
             [
               if(School-Value-Added-Distribution = "uniform") [ set value-added 0.1 ]
-              if(School-Value-Added-Distribution = "normal") [ set value-added random-normal 0 0.2 ]
+              if(School-Value-Added-Distribution = "normal") [ set value-added random-normal 0 0.3 ]
 
               if(value-added < 0) [ set value-added (value-added * -1) ] ;do not allow value-added to be negative
 
@@ -860,7 +860,7 @@ to move
 
             if(newHome != nobody)
             [
-              ;show initialHome
+              show initialHome
               ask schools
               [
                 ;if(member? [newHome] of myself catchmentPatches) [ show word "removing newHome: " [newHome] of myself ]
@@ -876,6 +876,7 @@ to move
         if(newHome != nobody)
         [
           move-to newHome
+
 
           if(any? other parents-here) ;Error check
           [
@@ -2021,7 +2022,7 @@ Avoided-Threshold
 Avoided-Threshold
 0
 1
-0.65
+0.45
 0.05
 1
 NIL
@@ -2147,14 +2148,14 @@ Patch-Value
 -1000
 
 CHOOSER
-23
-891
-215
-936
+1228
+128
+1420
+173
 Parent-Colours
 Parent-Colours
 "satisfaction" "school" "aspiration" "attainment" "attainment-change" "moved" "best school allocation" "worst school allocation" "strategy" "age" "allocated-distance" "household income"
-1
+5
 
 CHOOSER
 24
@@ -2431,7 +2432,7 @@ SWITCH
 113
 Move-Best
 Move-Best
-1
+0
 1
 -1000
 
