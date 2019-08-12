@@ -82,6 +82,9 @@ patches-own
   house-price
   within-lbbd
   mean-hhold-income
+  original-price
+  current-price
+  price-updated
 ]
 
 ;;----------------------------------
@@ -294,6 +297,9 @@ to setup-Patches
       set mean-house-price gis:property-value feature "HPRICE"
       set house-price log-normal mean-house-price 4000
       set mean-hhold-income gis:property-value feature "HHOLDINC"
+      set original-price house-price
+      set current-price original-price
+      set price-updated false
     ]
   ]
 
@@ -352,6 +358,7 @@ to go
   age-PupilCohorts ;move cohorts of students up one year
   add-NewParents ;add new parents for this tick
   set-schoolCatchments ;find patches in catchment available to move into this tick (do this after adding new parents)
+  update-HousePrice
 
 
   show "Parents ranking schools"
@@ -401,6 +408,73 @@ to go
     stop
   ]
 
+
+end
+
+to update-HousePrice
+  let tempSchools sort-by [ [?1 ?2] -> [GCSE-score] of ?1 > [GCSE-score] of ?2 ] schools
+  let thisRank 0
+
+  ask patches with [within-lbbd = true]
+  [
+    set price-updated false
+  ]
+
+  while[thisRank < 10]
+  [
+    let tempPatches [catchmentPatches] of item thisRank tempSchools
+    ifelse (thisRank < 1)
+    [
+      ask patch-set tempPatches
+      [
+        set current-price current-price * 1.1
+        set price-updated true
+      ]
+    ]
+    [
+      ifelse (thisRank < 2)
+      [
+        ask patch-set tempPatches
+        [
+          set current-price current-price * 1.08
+          set price-updated true
+        ]
+      ]
+      [
+        ifelse (thisRank < 5)
+        [
+          ask patch-set tempPatches
+          [
+            set current-price current-price * 1.04
+            set price-updated true
+          ]
+        ]
+        [
+          ifelse (thisRank < 8)
+          [
+            ask patch-set tempPatches
+            [
+              set current-price current-price * 1.02
+              set price-updated true
+            ]
+          ]
+          [
+            ask patch-set tempPatches
+            [
+              set current-price current-price * 1.01
+              set price-updated true
+            ]
+          ]
+        ]
+      ]
+    ]
+    set thisRank thisRank + 1
+  ]
+  ask patches with [within-lbbd = true and price-updated = false]
+  [
+    set current-price current-price * 1.005
+    set price-updated true
+  ]
 
 end
 
@@ -1028,11 +1102,11 @@ to add-NewParents
       [
         if(not any? turtles-here)
         [
-          let mean-income [mean-hhold-income] of self
+          let house-price-here [current-price] of self
           create-parent
           ask parents-here
           [
-            set hhold-income log-normal mean-income 4500
+            set hhold-income house-price-here / Price-Income-Ratio
             while [aspiration < 0 or aspiration > 100]
               [
                 set aspiration random-normal 50 20
@@ -1356,6 +1430,13 @@ to update-Colours
 
   let bestSchool max-one-of schools [GCSE-score]
   let worstSchool min-one-of schools [GCSE-score]
+  let max-hhold-income 1
+  let min-hhold-income 1000000
+  ask parents
+  [
+    if ([hhold-income] of self < min-hhold-income) [set min-hhold-income [hhold-income] of self]
+    if ([hhold-income] of self > max-hhold-income) [set max-hhold-income [hhold-income] of self]
+  ]
 
   ;show parents with specified colours
   ifelse(Patch-Value = false)
@@ -1435,9 +1516,10 @@ to update-Colours
 
       if(Parent-Colours = "household income")
       [
-        ifelse(hhold-income = 100)
-        [ set color 19.9 ]
-        [ set color (hhold-income / 6300) + 10 ]
+;        let norm-hhold-income (hhold-income - min-hhold-income) / (max-hhold-income - min-hhold-income)
+;        set color (norm-hhold-income * 5) + 15
+;        ;set color (norm-hhold-income * 10) + 10
+        set color (hhold-income / 12000) + 10
       ]
 
       if(Parent-Colours = "attainment")
@@ -2603,8 +2685,8 @@ end
 GRAPHICS-WINDOW
 188
 10
-929
-752
+907
+730
 -1
 -1
 5.3504
@@ -2617,10 +2699,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--68
-68
--68
-68
+-66
+66
+-66
+66
 0
 0
 1
@@ -2731,7 +2813,7 @@ Avoided-Threshold
 Avoided-Threshold
 0
 1
-0.55
+0.65
 0.05
 1
 NIL
@@ -2796,7 +2878,7 @@ SWITCH
 613
 Location-Rules
 Location-Rules
-1
+0
 1
 -1000
 
@@ -2864,7 +2946,7 @@ CHOOSER
 Parent-Colours
 Parent-Colours
 "satisfaction" "school" "aspiration" "attainment" "attainment-change" "moved" "best school allocation" "worst school allocation" "strategy" "age" "allocated-distance" "household income"
-1
+11
 
 CHOOSER
 24
@@ -3141,7 +3223,7 @@ SWITCH
 117
 Move-Best
 Move-Best
-1
+0
 1
 -1000
 
@@ -3185,7 +3267,7 @@ SWITCH
 367
 Export-Movie
 Export-Movie
-1
+0
 1
 -1000
 
