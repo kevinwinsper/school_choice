@@ -118,59 +118,6 @@ end
 to setup-Parents
   print "setting up parents"
 
-;;setting up parents by LSOA
-;  foreach gis:feature-list-of lbbd-msoa [ feature ->
-;    let addedParents 0
-;    while [ addedParents < 300]
-;    [
-;      ask one-of (patches gis:intersecting feature)
-;      [
-;        if gis:contained-by? self feature [
-;          if(not any? turtles-here) ; make sure parents do not occupy school patch
-;          [
-;            sprout-parents 1
-;            [
-;              set color grey
-;              set size 1
-;              set shape "circle"
-;              facexy 0 0
-;
-;              set aspiration -1
-;              while [aspiration < 0 or aspiration > 100]
-;              [
-;                set aspiration random-normal 50 20
-;              ]
-;              set child-attainment aspiration
-;
-;              set hhold-income log-normal gis:property-value feature "HHOLDINC" 4500
-;
-;              set child-age (floor ((addedParents + 1) / (300 / 7))) + 9
-;
-;              set allocated-school 0
-;
-;              set have-moved false
-;              set want-to-move true
-;              set initialHome myself
-;              set newHome nobody
-;
-;              set rankings []
-;
-;              set success-by-rank -1
-;              set success-rank1 -1
-;              set success-by-aspiration -1
-;              set strategy -1
-;            ]
-;            set addedParents addedParents + 1
-;          ]
-;        ]
-;      ]
-;    ]
-;    if(any? parents with [child-age = 16])
-;    [
-;      ask parents with [child-age = 16] [ set child-age 9 ]
-;    ]
-;  ]
-
   let addedParents 0
   while [ addedParents < 7000]
   [
@@ -189,7 +136,7 @@ to setup-Parents
           set hhold-income log-normal mean-income 4500
 
           set aspiration -1
-          while [aspiration < 0 or aspiration > 100]
+          while [aspiration < 30 or aspiration > 100]
           [
             set aspiration random-normal 50 20
           ]
@@ -327,23 +274,23 @@ to go
 
   if(ticks = 0)
   [
-;    with-local-randomness
-;    [
-;      if(Export-Summary-Data or Export-World-Data or Export-Movie)
-;      [
-;        ;create a new directory for this model run
-;
-;      ]
-;
-;      if(Export-Summary-Data) [ ExportSummaryData_header ]
-;      if(Export-World-Data) [ ExportWorldData_initial ]
-;      if(Export-Movie)
-;      [
-;        set _recording-save-file-name "movie.mov"
-;        vid:start-recorder
-;        vid:record-view
-;      ]
-;    ]
+    with-local-randomness
+    [
+      if(Export-Summary-Data or Export-World-Data or Export-Movie)
+      [
+        ;create a new directory for this model run
+
+      ]
+
+      if(Export-Summary-Data) [ ExportSummaryData_header ]
+      if(Export-World-Data) [ ExportWorldData_initial ]
+      if(Export-Movie)
+      [
+        set _recording-save-file-name "movie.mov"
+        vid:start-recorder
+        vid:record-view
+      ]
+    ]
 
 
     ask parents [set-parent-school-distance]
@@ -384,27 +331,27 @@ to go
     update-colours
     plotting
 
-;    if(Export-Summary-Data)
-;    [
-;      calc-Moran
-;      calc-relationships
-;      ExportSummaryData
-;    ]
-;
-;    if(Export-World-Data) [ ExportWorldData ]
-;    if(Export-Movie) [ vid:record-view ]
+    if(Export-Summary-Data)
+    [
+      ;calc-Moran
+      ;calc-relationships
+      ExportSummaryData
+    ]
+
+    if(Export-World-Data) [ ExportWorldData ]
+    if(Export-Movie) [ vid:record-view ]
   ]
 
   tick
 
   if(ticks = run-length)
   [
-;    if(Export-Movie) [ vid:save-recording _recording-save-file-name ]
-;    if(Export-Summary-Data)
-;    [
-;      export-worldview
-;      ;ZipParents_Data
-;    ]
+    if(Export-Movie) [ vid:save-recording _recording-save-file-name ]
+    if(Export-Summary-Data)
+    [
+      export-worldview
+      ;ZipParents_Data
+    ]
     stop
   ]
 
@@ -655,7 +602,7 @@ to rank-Schools
             ]
           ]
         ]
-        if(not is-list? rankings) [set want-to-move false] ; if parent cannot afford school in any catchment area
+        ;if(rankings = []) [set want-to-move false] ; if parent cannot afford school in any catchment area
       ]
     ]
 
@@ -871,7 +818,7 @@ end
 
 to move
 
-  ask parents [ if(child-age = 10 and have-moved = false) [set want-to-move false ] ] ;don't move once child-age > 10
+  ;ask parents [ if(child-age = 10 and have-moved = false) [set want-to-move false ] ] ;don't move once child-age > 10
 
   let movers no-turtles
 
@@ -1055,7 +1002,7 @@ to add-NewParents
           ask parents-here
           [
             set hhold-income log-normal mean-income 4500
-            while [aspiration < 0 or aspiration > 100]
+            while [aspiration < 30 or aspiration > 100]
               [
                 set aspiration random-normal 50 20
               ]
@@ -1106,8 +1053,8 @@ to add-NewParents
           create-parent
           ask parents-here
           [
-            set hhold-income house-price-here / Price-Income-Ratio
-            while [aspiration < 0 or aspiration > 100]
+            set hhold-income house-price-here / (Price-Income-Ratio - 0.5)
+            while [aspiration < 30 or aspiration > 100]
               [
                 set aspiration random-normal 50 20
               ]
@@ -1520,6 +1467,7 @@ to update-Colours
 ;        set color (norm-hhold-income * 5) + 15
 ;        ;set color (norm-hhold-income * 10) + 10
         set color (hhold-income / 12000) + 10
+        if (color > 19.9) [set color 19.9]
       ]
 
       if(Parent-Colours = "attainment")
@@ -2123,559 +2071,559 @@ end
 ;;----------------------------------
 ;;DATA EXPORT
 ;;----------------------------------
-;to ExportPlots
-;
-;  let prefix "plots"
-;  let suffix ".csv"
-;  let index next-index prefix suffix
-;  let filename (word prefix index suffix)
-;
-;  export-all-plots filename
-;
-;end
-;
-;to ExportView
-;
-;  let prefix "interface"
-;  let suffix ".png"
-;  let index next-index prefix suffix
-;  let filename (word prefix index suffix)
-;
-;  export-view filename
-;
-;end
-;
-;;from TurtleZero?
-;to-report next-index [ prefix suffix ]
-;  let index 0
-;  let filename (word prefix index suffix )
-;  while [ file-exists? filename ]
-;  [
-;    set index index + 1
-;    set filename (word prefix index suffix )
-;  ]
-;  report index
-;end
-;
-;
-;
-;
-;to ExportSummaryData
-;
-;  show "Exporting summary data"
-;
-;  ;file-open "Schools_SummaryData.csv"
-;
-;  let dummy "Schools_SummaryData_Exp"
-;  let suffix ".csv"
-;  let filename (word dummy exp-index suffix)
-;  file-open filename
-;
-;  ask schools
-;  [
-;
-;    ;summarise y7 parents
-;    let max-distance_y7 max-one-of turtle-set y7Parents [distance myself]
-;    ifelse(max-distance_y7 = nobody)
-;    [ set max-distance_y7 -1 ]
-;    [ set max-distance_y7 distance max-distance_y7 ]
-;
-;
-;    let mean-distance_y7 0
-;    let mean-aspiration_y7 0
-;    let mean-attainment_y7 0
-;    let parents_moved_y7 0
-;    let parents_strategy1_y7 0
-;    let parents_strategy2_y7 0
-;    let parents_strategy3_y7 0
-;    let parents_strategy4_y7 0
-;    let parents_strategy5_y7 0
-;    let parents_strategy6_y7 0
-;    let parents_strategy7_y7 0
-;    let parents_strategy8_y7 0
-;    let success-aspiration 0
-;
-;    foreach y7Parents
-;    [ [?1] ->
-;      set mean-distance_y7 mean-distance_y7 + distance ?1
-;      set mean-aspiration_y7 mean-aspiration_y7 + [aspiration] of ?1
-;      set mean-attainment_y7 mean-attainment_y7 + [child-attainment] of ?1
-;      if([have-moved] of ?1 = true) [ set parents_moved_y7 parents_moved_y7 + 1 ]
-;
-;      if([strategy] of ?1 = 1) [ set  parents_strategy1_y7  parents_strategy1_y7 + 1 ]
-;      if([strategy] of ?1 = 2) [ set  parents_strategy2_y7  parents_strategy2_y7 + 1 ]
-;      if([strategy] of ?1 = 3) [ set  parents_strategy3_y7  parents_strategy3_y7 + 1 ]
-;      if([strategy] of ?1 = 4) [ set  parents_strategy4_y7  parents_strategy4_y7 + 1 ]
-;      if([strategy] of ?1 = 5) [ set  parents_strategy5_y7  parents_strategy5_y7 + 1 ]
-;      if([strategy] of ?1 = 6) [ set  parents_strategy6_y7  parents_strategy6_y7 + 1 ]
-;      if([strategy] of ?1 = 7) [ set  parents_strategy7_y7  parents_strategy7_y7 + 1 ]
-;      if([strategy] of ?1 = 8) [ set  parents_strategy8_y7  parents_strategy8_y7 + 1 ]
-;
-;      if(GCSE-score < [aspiration] of ?1) [ set success-aspiration success-aspiration + 1 ]
-;    ]
-;
-;
-;    ifelse(length y7Parents > 0)
-;    [
-;      set mean-distance_y7 mean-distance_y7 / length y7Parents
-;      set mean-aspiration_y7 mean-aspiration_y7 / length y7Parents
-;      set mean-attainment_y7 mean-attainment_y7 / length y7Parents
-;
-;    ]
-;    [
-;      set mean-distance_y7 -1
-;      set mean-aspiration_y7 -1
-;      set mean-attainment_y7 -1
-;    ]
-;
-;
-;
-;    ;summarise y11 parents
-;    let max-distance_y11 max-one-of turtle-set y11Parents [distance myself]
-;    ifelse(max-distance_y11 = nobody)
-;    [ set max-distance_y11 -1 ]
-;    [ set max-distance_y11 distance max-distance_y11 ]
-;
-;
-;    let mean-distance_y11 0
-;    let mean-aspiration_y11 0
-;    let mean-attainment_y11 0
-;    let success-attainment 0
-;
-;
-;    foreach y11Parents
-;    [ [?1] ->
-;      set mean-distance_y11 mean-distance_y11 + distance ?1
-;      set mean-aspiration_y11 mean-aspiration_y11 + [aspiration] of ?1
-;      set mean-attainment_y11 mean-attainment_y11 + [child-attainment] of ?1
-;      if([child-attainment] of ?1 > [aspiration] of ?1) [ set success-attainment success-attainment + 1 ]
-;    ]
-;
-;    ifelse(length y11Parents > 0)
-;    [
-;      set mean-distance_y11 mean-distance_y11 / length y11Parents
-;      set mean-aspiration_y11 mean-aspiration_y11 / length y11Parents
-;      set mean-attainment_y11 mean-attainment_y11 / length y11Parents
-;    ]
-;
-;    [
-;      set mean-distance_y11 -1
-;      set mean-aspiration_y11 -1
-;      set mean-attainment_y11 -1
-;    ]
-;
-;
-;    let mean-attainment_change_y11 0
-;    let count-attainment_change+_y11 0
-;    let count-attainment_change-_y11 0
-;
-;    ask turtle-set y11Parents
-;    [
-;      let my-attainment-change child-attainment - aspiration
-;      set mean-attainment_change_y11 mean-attainment_change_y11 + my-attainment-change
-;
-;      ifelse(my-attainment-change > 0)
-;      [ set count-attainment_change+_y11 count-attainment_change+_y11 + 1 ]
-;      [ set count-attainment_change-_y11 count-attainment_change-_y11 + 1 ]
-;    ]
-;
-;    ifelse(length y11Parents > 0)
-;    [ set mean-attainment_change_y11 mean-attainment_change_y11 / length y11Parents ]
-;    [ set mean-attainment_change_y11 -1 ]
-;
-;
-;    let unallocated []
-;    let all-applicants-list sort all-applicants
-;    foreach all-applicants-list
-;    [ [?1] ->
-;      if(not member? ?1 allocated) [set unallocated lput ?1 unallocated]
-;    ]
-;    let max-distance_unallocated max-one-of turtle-set unallocated [distance myself]
-;    ifelse(max-distance_unallocated = nobody)
-;    [ set max-distance_unallocated -1 ]
-;    [ set max-distance_unallocated distance max-distance_unallocated ]
-;
-;
-;    let mean-aspiration_unallocated 0
-;    let mean-distance_unallocated 0
-;
-;    foreach unallocated
-;    [ [?1] ->
-;      set mean-aspiration_unallocated mean-aspiration_unallocated + [aspiration] of ?1
-;      set mean-distance_unallocated mean-distance_unallocated + distance ?1
-;    ]
-;
-;    ifelse(length unallocated > 0)
-;    [
-;      set mean-aspiration_unallocated mean-aspiration_unallocated / length unallocated
-;      set mean-distance_unallocated mean-distance_unallocated / length unallocated
-;    ]
-;    [
-;      set mean-aspiration_unallocated -1
-;      set mean-distance_unallocated -1
-;    ]
-;
-;
-;
-;    let myRanks [ 0 0 0 0 0 0 ]
-;    ask turtle-set allocated
-;    [
-;
-;      let thisRank 0
-;
-;      if(length rankings > 1)
-;      [
-;        while[thisRank < Number-of-Ranks]
-;        [
-;          if(item thisRank rankings = myself) [ set myRanks replace-item thisRank myRanks (item thisRank myRanks + 1) ]
-;          set thisRank thisRank + 1
-;        ]
-;      ]
-;    ]
-;
-;    let parents_rank1_y7 item 0 myRanks
-;    let parents_rank2_y7 item 1 myRanks
-;    let parents_rank3_y7 item 2 myRanks
-;    let parents_rank4_y7 item 3 myRanks
-;    let parents_rank5_y7 item 4 myRanks
-;    let parents_rank6_y7 item 5 myRanks
-;
-;    let parents_unranked_y7 0
-;    ask turtle-set allocated [ if(not member? myself rankings) [ set parents_unranked_y7 parents_unranked_y7 + 1 ] ]
-;
-;
-;    let parents_avoiding_y7 0
-;    ask parents with [child-age = 11]
-;    [
-;      if(member? myself avoided) [ set parents_avoiding_y7 parents_avoiding_y7 + 1 ]
-;    ]
-;
-;
-;
-;
-;    file-type ticks
-;    file-type ","
-;    file-type id
-;    file-type ","
-;    file-type school-type
-;    file-type ","
-;    file-type xcor
-;    file-type ","
-;    file-type ycor
-;    file-type ","
-;    file-type all-pupils
-;    file-type ","
-;    file-type precision value-added 2
-;    file-type ","
-;    file-type precision GCSE-score 2
-;    file-type ","
-;    file-type precision app-ratio 2
-;    file-type ","
-;    file-type precision max-distance_y7 2
-;    file-type ","
-;    file-type precision max-distance_y11 2
-;    file-type ","
-;    file-type precision max-distance_unallocated 2
-;    file-type ","
-;    file-type precision mean-distance_y7 2
-;    file-type ","
-;    file-type precision mean-distance_y11 2
-;    file-type ","
-;    file-type precision mean-distance_unallocated 2
-;    file-type ","
-;    file-type precision mean-aspiration_y7 2
-;    file-type ","
-;    file-type precision mean-aspiration_y11 2
-;    file-type ","
-;    file-type precision mean-aspiration_unallocated 2
-;    file-type ","
-;    file-type precision mean-attainment_y7 2
-;    file-type ","
-;    file-type precision mean-attainment_y11 2
-;    file-type ","
-;    file-type precision parents_rank1_y7 2
-;    file-type ","
-;    file-type precision parents_rank2_y7 2
-;    file-type ","
-;    file-type precision parents_rank3_y7 2
-;    file-type ","
-;    file-type precision parents_rank4_y7 2
-;    file-type ","
-;    file-type precision parents_rank5_y7 2
-;    file-type ","
-;    file-type precision parents_rank6_y7 2
-;    file-type ","
-;    file-type precision parents_unranked_y7 2
-;    file-type ","
-;    file-type precision success-aspiration 2
-;    file-type ","
-;    file-type precision success-attainment 2
-;    file-type ","
-;    file-type precision parents_avoiding_y7 2
-;    file-type ","
-;    file-type precision parents_moved_y7 2
-;    file-type ","
-;    file-type precision mean-attainment_change_y11 2
-;    file-type ","
-;    file-type precision count-attainment_change+_y11 2
-;    file-type ","
-;    file-type precision count-attainment_change-_y11 2
-;    file-type ","
-;    file-type precision parents_strategy1_y7 2
-;    file-type ","
-;    file-type precision parents_strategy2_y7 2
-;    file-type ","
-;    file-type precision parents_strategy3_y7 2
-;    file-type ","
-;    file-type precision parents_strategy4_y7 2
-;    file-type ","
-;    file-type precision parents_strategy5_y7 2
-;    file-type ","
-;    file-type precision parents_strategy6_y7 2
-;    file-type ","
-;    file-type precision parents_strategy7_y7 2
-;    file-type ","
-;    file-print precision parents_strategy8_y7 2
-;
-;  ]
-;
-;    file-close
-;
-;    ;file-open "Parents_Data.csv"
-;
-;    set dummy "Parents_Data_Exp"
-;    set filename (word dummy exp-index suffix)
-;    file-open filename
-;
-;    ask parents
-;    [
-;       file-type ticks
-;       file-type ","
-;       file-type who
-;       file-type ","
-;       file-type xcor
-;       file-type ","
-;       file-type ycor
-;       file-type ","
-;       file-type precision aspiration 2
-;       file-type ","
-;       file-type child-age
-;       file-type ","
-;
-;       ifelse(allocated-school != 0)
-;       [
-;         file-type [id] of allocated-school
-;         file-type ","
-;
-;         file-type precision allocated-distance 2 ;07Sept12 moved this line here from next ifelse to ensure distance is always output
-;         file-type ","
-;
-;         ifelse(is-turtle? first rankings)
-;         [
-;           file-type [id] of first rankings
-;           file-type ","
-;         ]
-;         [
-;           file-type -1
-;           file-type ","
-;         ]
-;
-;         file-type success-by-rank
-;         file-type ","
-;
-;         file-type success-rank1
-;         file-type ","
-;
-;         file-type precision child-attainment 2
-;         file-type ","
-;
-;         file-type strategy
-;         file-type ","
-;
-;         ifelse(have-moved)
-;         [ file-print 1 ]
-;         [ file-print 0 ]
-;       ]
-;
-;
-;
-;       [
-;         file-type -1
-;         file-type ","
-;         file-type -1
-;         file-type ","
-;         file-type -1
-;         file-type ","
-;         file-type -1
-;         file-type ","
-;         file-type -1
-;         file-type ","
-;         file-type -1
-;         file-type ","
-;         file-type -1
-;         file-type ","
-;         file-print -1
-;       ]
-;    ]
-;
-;    file-close
-;
-;    ;file-open "World_SummaryData.csv"
-;
-;    set dummy "World_SummaryData_Exp"
-;    set filename (word dummy exp-index suffix)
-;    file-open filename
-;
-;    file-type ticks
-;    file-type ","
-;    file-type mean [GCSE-score] of schools
-;    file-type ","
-;    file-type ((max [GCSE-score] of schools) - (min [GCSE-score] of schools))
-;    file-type ","
-;    file-type mean [app-ratio] of schools
-;    file-type ","
-;    file-type ((max [app-ratio] of schools) - (min [app-ratio] of schools))
-;    file-type ","
-;    file-type asp-moran-i
-;    file-type ","
-;    file-type asp-moran-i-p
-;    file-type ","
-;    file-type att-moran-i
-;    file-type ","
-;    file-type att-moran-i-p
-;    file-type ","
-;    file-type GA-m
-;    file-type ","
-;    file-type GA-r
-;    file-type ","
-;    file-type GA-p
-;    file-type ","
-;    file-type GMx-m
-;    file-type ","
-;    file-type GMx-r
-;    file-type ","
-;    file-type GMx-p
-;    file-type ","
-;    file-type GMn-m
-;    file-type ","
-;    file-type GMn-r
-;    file-type ","
-;    file-type GMn-p
-;    file-type ","
-;    file-type AMx-m
-;    file-type ","
-;    file-type AMx-r
-;    file-type ","
-;    file-type AMx-p
-;    file-type ","
-;    file-type AMn-m
-;    file-type ","
-;    file-type AMn-r
-;    file-type ","
-;    file-print AMn-p
-;
-;    file-close
-;
-;end
-;
-;
-;to ExportSummaryData_header
-;
-;  show "Exporting summary data"
-;
-;  let dummy "Schools_SummaryData_Exp"
-;  let suffix ".csv"
-;  let filename (word dummy exp-index suffix)
-;  file-open filename
-;  write-experiment-data
-;  file-print "Tick,School_id,school-type,school-x-cor,school-y-cor,all-pupils,Value-Added,GCSE-score,App-ratio,max-distance_y7,max-distance_y11,max-distance_unallocated,mean-distance_y7,mean-distance_y11,mean-distance_unallocated,mean-aspiration_y7,mean-aspiration_y11,mean-aspiration_unallocated,mean-attainment_y7,mean-attainment_y11,parents_rank1_y7,parents_rank2_y7,parents_rank3_y7,parents_rank4_y7,parents_rank5_y7,parents_rank6_y7,parents_unranked_y7,success-aspiration_y7,success-attainment_y11,parents_avoiding_y7,parents_moved_y7,mean-attainment_change_y11,count-attainment_change+_y11,count-attainment_change-_y11,parents_strategy1_y7,parents_strategy2_y7,parents_strategy3_y7,parents_strategy4_y7,parents_strategy5_y7,parents_strategy6_y7,parents_strategy7_y7,parents_strategy8_y7"
-;  file-close
-;
-;  set dummy "Parents_Data_Exp"
-;  set filename (word dummy exp-index suffix)
-;  file-open filename
-;  file-print word "Date/time: " date-and-time
-;  file-print "Tick,parent,x-cor,y-cor,aspiration,child-age,allocated-school,allocated-distance,preferred-school,allocated-rank,success-rank1,child-attainment,strategy,have-moved"
-;  file-close
-;
-;  set dummy "World_SummaryData_Exp"
-;  set filename (word dummy exp-index suffix)
-;  file-open filename
-;  write-experiment-data
-;  file-print "Tick,MeanGCSE,RangeGCSE,MeanAppRatio,RangeAppRatio,asp-moran-i,asp-moran-i-p,pv-moran-i,pv-moran-i-p,GA-m,GA-r,GA-p,GMx-m,GMx-r,GMx-p,GMn-m,GMn-r,GMn-p,AMx-m,AMx-r,AMx-p,AMn-m,AMn-r,AMn-p"
-;  file-close
-;
-;end
-;
-;
-;
-;to write-experiment-data
-;
-;  ;FILE MUST ALREADY BE OPEN!
-;  file-print word "Date/time: " date-and-time
-;  file-print word "seed," seed
-;  file-print word "Families," Families
-;  file-print word "Parent-Memory," Parent-Memory
-;  file-print word "SchoolSize," SchoolSize
-;  file-print word "Number-of-Schools," Number-of-Schools
-;  file-print word "Departure-Probability," 1
-;  file-print word "Number-of-Ranks," Number-of-Ranks
-;  file-print word "Random-Schools," Random-Schools
-;  file-print word "Min-School-Spacing," Min-School-Spacing
-;  file-print word "Initial-School-GCSE-Distribution," Initial-School-GCSE-Distribution
-;  file-print word "School-Value-Added," School-Value-Added
-;  file-print word "Parent-Aspiration-Distribution," Parent-Aspiration-Distribution
-;  file-print word "Aspiration-Mean," Aspiration-Mean
-;  file-print word "School-Value-Added-Distribution," School-Value-Added-Distribution
-;  file-print word "Location-Rules," Location-Rules
-;  file-print word "Move-Closest," Move-Closest
-;  file-print word "Avoid-Schools," Avoid-Schools
-;  file-print word "Avoided-Threshold," Avoided-Threshold
-;  file-print word "School-Peer-Effect," School-Peer-Effect
-;  file-print word "School-Quality-Effect," School-Quality-Effect
-;  file-print word "Parent-Effect," Parent-Effect
-;  file-print word "Attainment=Aspiration?," attainment=aspiration?
-;
-;end
-;
-;
-;to ExportWorldData
-;
-;  show "Exporting world data"
-;
-;  let dummy "World_Exp"
-;  let filename (word dummy exp-index "_Tick" ticks ".csv")
-;  export-world filename
-;
-;  ;let cmd (word "C:\\Program Files\\WinRAR\\WinRAR.exe\" A -dr -ep -ibck " directory "\\" "World_tick" ticks ".rar " directory "\\" filename)
-;  ;show cmd
-;  ;show shell:exec cmd
-;
-;end
-;
-;
-;to ExportWorldData_initial
-;
-;  show "Exporting world data"
-;  let filename (word "World_Exp" exp-index "_Tick_initial.csv")
-;  export-world filename
-;
-;  ;let cmd (word "C:\\Program Files\\WinRAR\\WinRAR.exe\" A -dr -ep -ibck " directory "\\" "World_tick_initial.rar " directory "\\" filename)
-;  ;show cmd
-;  ;show shell:exec cmd
-;
-;end
-;
-;
-;
-;
-;to export-worldview
-;
-;  show "Exporting world view"
-;  let filename (word "WorldView_Exp" exp-index "_Tick" ticks ".png")
-;  export-view filename
-;
-;end
+to ExportPlots
+
+  let prefix "plots"
+  let suffix ".csv"
+  let index next-index prefix suffix
+  let filename (word prefix index suffix)
+
+  export-all-plots filename
+
+end
+
+to ExportView
+
+  let prefix "interface"
+  let suffix ".png"
+  let index next-index prefix suffix
+  let filename (word prefix index suffix)
+
+  export-view filename
+
+end
+
+;from TurtleZero?
+to-report next-index [ prefix suffix ]
+  let index 0
+  let filename (word prefix index suffix )
+  while [ file-exists? filename ]
+  [
+    set index index + 1
+    set filename (word prefix index suffix )
+  ]
+  report index
+end
+
+
+
+
+to ExportSummaryData
+
+  show "Exporting summary data"
+
+  ;file-open "Schools_SummaryData.csv"
+
+  let dummy "Schools_SummaryData_Exp"
+  let suffix ".csv"
+  let filename (word dummy exp-index suffix)
+  file-open filename
+
+  ask schools
+  [
+
+    ;summarise y7 parents
+    let max-distance_y7 max-one-of turtle-set y7Parents [distance myself]
+    ifelse(max-distance_y7 = nobody)
+    [ set max-distance_y7 -1 ]
+    [ set max-distance_y7 distance max-distance_y7 ]
+
+
+    let mean-distance_y7 0
+    let mean-aspiration_y7 0
+    let mean-attainment_y7 0
+    let parents_moved_y7 0
+    let parents_strategy1_y7 0
+    let parents_strategy2_y7 0
+    let parents_strategy3_y7 0
+    let parents_strategy4_y7 0
+    let parents_strategy5_y7 0
+    let parents_strategy6_y7 0
+    let parents_strategy7_y7 0
+    let parents_strategy8_y7 0
+    let success-aspiration 0
+
+    foreach y7Parents
+    [ [?1] ->
+      set mean-distance_y7 mean-distance_y7 + distance ?1
+      set mean-aspiration_y7 mean-aspiration_y7 + [aspiration] of ?1
+      set mean-attainment_y7 mean-attainment_y7 + [child-attainment] of ?1
+      if([have-moved] of ?1 = true) [ set parents_moved_y7 parents_moved_y7 + 1 ]
+
+      if([strategy] of ?1 = 1) [ set  parents_strategy1_y7  parents_strategy1_y7 + 1 ]
+      if([strategy] of ?1 = 2) [ set  parents_strategy2_y7  parents_strategy2_y7 + 1 ]
+      if([strategy] of ?1 = 3) [ set  parents_strategy3_y7  parents_strategy3_y7 + 1 ]
+      if([strategy] of ?1 = 4) [ set  parents_strategy4_y7  parents_strategy4_y7 + 1 ]
+      if([strategy] of ?1 = 5) [ set  parents_strategy5_y7  parents_strategy5_y7 + 1 ]
+      if([strategy] of ?1 = 6) [ set  parents_strategy6_y7  parents_strategy6_y7 + 1 ]
+      if([strategy] of ?1 = 7) [ set  parents_strategy7_y7  parents_strategy7_y7 + 1 ]
+      if([strategy] of ?1 = 8) [ set  parents_strategy8_y7  parents_strategy8_y7 + 1 ]
+
+      if(GCSE-score < [aspiration] of ?1) [ set success-aspiration success-aspiration + 1 ]
+    ]
+
+
+    ifelse(length y7Parents > 0)
+    [
+      set mean-distance_y7 mean-distance_y7 / length y7Parents
+      set mean-aspiration_y7 mean-aspiration_y7 / length y7Parents
+      set mean-attainment_y7 mean-attainment_y7 / length y7Parents
+
+    ]
+    [
+      set mean-distance_y7 -1
+      set mean-aspiration_y7 -1
+      set mean-attainment_y7 -1
+    ]
+
+
+
+    ;summarise y11 parents
+    let max-distance_y11 max-one-of turtle-set y11Parents [distance myself]
+    ifelse(max-distance_y11 = nobody)
+    [ set max-distance_y11 -1 ]
+    [ set max-distance_y11 distance max-distance_y11 ]
+
+
+    let mean-distance_y11 0
+    let mean-aspiration_y11 0
+    let mean-attainment_y11 0
+    let success-attainment 0
+
+
+    foreach y11Parents
+    [ [?1] ->
+      set mean-distance_y11 mean-distance_y11 + distance ?1
+      set mean-aspiration_y11 mean-aspiration_y11 + [aspiration] of ?1
+      set mean-attainment_y11 mean-attainment_y11 + [child-attainment] of ?1
+      if([child-attainment] of ?1 > [aspiration] of ?1) [ set success-attainment success-attainment + 1 ]
+    ]
+
+    ifelse(length y11Parents > 0)
+    [
+      set mean-distance_y11 mean-distance_y11 / length y11Parents
+      set mean-aspiration_y11 mean-aspiration_y11 / length y11Parents
+      set mean-attainment_y11 mean-attainment_y11 / length y11Parents
+    ]
+
+    [
+      set mean-distance_y11 -1
+      set mean-aspiration_y11 -1
+      set mean-attainment_y11 -1
+    ]
+
+
+    let mean-attainment_change_y11 0
+    let count-attainment_change+_y11 0
+    let count-attainment_change-_y11 0
+
+    ask turtle-set y11Parents
+    [
+      let my-attainment-change child-attainment - aspiration
+      set mean-attainment_change_y11 mean-attainment_change_y11 + my-attainment-change
+
+      ifelse(my-attainment-change > 0)
+      [ set count-attainment_change+_y11 count-attainment_change+_y11 + 1 ]
+      [ set count-attainment_change-_y11 count-attainment_change-_y11 + 1 ]
+    ]
+
+    ifelse(length y11Parents > 0)
+    [ set mean-attainment_change_y11 mean-attainment_change_y11 / length y11Parents ]
+    [ set mean-attainment_change_y11 -1 ]
+
+
+    let unallocated []
+    let all-applicants-list sort all-applicants
+    foreach all-applicants-list
+    [ [?1] ->
+      if(not member? ?1 allocated) [set unallocated lput ?1 unallocated]
+    ]
+    let max-distance_unallocated max-one-of turtle-set unallocated [distance myself]
+    ifelse(max-distance_unallocated = nobody)
+    [ set max-distance_unallocated -1 ]
+    [ set max-distance_unallocated distance max-distance_unallocated ]
+
+
+    let mean-aspiration_unallocated 0
+    let mean-distance_unallocated 0
+
+    foreach unallocated
+    [ [?1] ->
+      set mean-aspiration_unallocated mean-aspiration_unallocated + [aspiration] of ?1
+      set mean-distance_unallocated mean-distance_unallocated + distance ?1
+    ]
+
+    ifelse(length unallocated > 0)
+    [
+      set mean-aspiration_unallocated mean-aspiration_unallocated / length unallocated
+      set mean-distance_unallocated mean-distance_unallocated / length unallocated
+    ]
+    [
+      set mean-aspiration_unallocated -1
+      set mean-distance_unallocated -1
+    ]
+
+
+
+    let myRanks [ 0 0 0 0 0 0 ]
+    ask turtle-set allocated
+    [
+
+      let thisRank 0
+
+      if(length rankings > 1)
+      [
+        while[thisRank < Number-of-Ranks]
+        [
+          if(item thisRank rankings = myself) [ set myRanks replace-item thisRank myRanks (item thisRank myRanks + 1) ]
+          set thisRank thisRank + 1
+        ]
+      ]
+    ]
+
+    let parents_rank1_y7 item 0 myRanks
+    let parents_rank2_y7 item 1 myRanks
+    let parents_rank3_y7 item 2 myRanks
+    let parents_rank4_y7 item 3 myRanks
+    let parents_rank5_y7 item 4 myRanks
+    let parents_rank6_y7 item 5 myRanks
+
+    let parents_unranked_y7 0
+    ask turtle-set allocated [ if(not member? myself rankings) [ set parents_unranked_y7 parents_unranked_y7 + 1 ] ]
+
+
+    let parents_avoiding_y7 0
+    ask parents with [child-age = 11]
+    [
+      if(member? myself avoided) [ set parents_avoiding_y7 parents_avoiding_y7 + 1 ]
+    ]
+
+
+
+
+    file-type ticks
+    file-type ","
+    file-type id
+    file-type ","
+    file-type school-type
+    file-type ","
+    file-type xcor
+    file-type ","
+    file-type ycor
+    file-type ","
+    file-type all-pupils
+    file-type ","
+    file-type precision value-added 2
+    file-type ","
+    file-type precision GCSE-score 2
+    file-type ","
+    file-type precision app-ratio 2
+    file-type ","
+    file-type precision max-distance_y7 2
+    file-type ","
+    file-type precision max-distance_y11 2
+    file-type ","
+    file-type precision max-distance_unallocated 2
+    file-type ","
+    file-type precision mean-distance_y7 2
+    file-type ","
+    file-type precision mean-distance_y11 2
+    file-type ","
+    file-type precision mean-distance_unallocated 2
+    file-type ","
+    file-type precision mean-aspiration_y7 2
+    file-type ","
+    file-type precision mean-aspiration_y11 2
+    file-type ","
+    file-type precision mean-aspiration_unallocated 2
+    file-type ","
+    file-type precision mean-attainment_y7 2
+    file-type ","
+    file-type precision mean-attainment_y11 2
+    file-type ","
+    file-type precision parents_rank1_y7 2
+    file-type ","
+    file-type precision parents_rank2_y7 2
+    file-type ","
+    file-type precision parents_rank3_y7 2
+    file-type ","
+    file-type precision parents_rank4_y7 2
+    file-type ","
+    file-type precision parents_rank5_y7 2
+    file-type ","
+    file-type precision parents_rank6_y7 2
+    file-type ","
+    file-type precision parents_unranked_y7 2
+    file-type ","
+    file-type precision success-aspiration 2
+    file-type ","
+    file-type precision success-attainment 2
+    file-type ","
+    file-type precision parents_avoiding_y7 2
+    file-type ","
+    file-type precision parents_moved_y7 2
+    file-type ","
+    file-type precision mean-attainment_change_y11 2
+    file-type ","
+    file-type precision count-attainment_change+_y11 2
+    file-type ","
+    file-type precision count-attainment_change-_y11 2
+    file-type ","
+    file-type precision parents_strategy1_y7 2
+    file-type ","
+    file-type precision parents_strategy2_y7 2
+    file-type ","
+    file-type precision parents_strategy3_y7 2
+    file-type ","
+    file-type precision parents_strategy4_y7 2
+    file-type ","
+    file-type precision parents_strategy5_y7 2
+    file-type ","
+    file-type precision parents_strategy6_y7 2
+    file-type ","
+    file-type precision parents_strategy7_y7 2
+    file-type ","
+    file-print precision parents_strategy8_y7 2
+
+  ]
+
+    file-close
+
+    ;file-open "Parents_Data.csv"
+
+    set dummy "Parents_Data_Exp"
+    set filename (word dummy exp-index suffix)
+    file-open filename
+
+    ask parents
+    [
+       file-type ticks
+       file-type ","
+       file-type who
+       file-type ","
+       file-type xcor
+       file-type ","
+       file-type ycor
+       file-type ","
+       file-type precision aspiration 2
+       file-type ","
+       file-type child-age
+       file-type ","
+
+       ifelse(allocated-school != 0)
+       [
+         file-type [id] of allocated-school
+         file-type ","
+
+         file-type precision allocated-distance 2 ;07Sept12 moved this line here from next ifelse to ensure distance is always output
+         file-type ","
+
+         ifelse(is-turtle? first rankings)
+         [
+           file-type [id] of first rankings
+           file-type ","
+         ]
+         [
+           file-type -1
+           file-type ","
+         ]
+
+         file-type success-by-rank
+         file-type ","
+
+         file-type success-rank1
+         file-type ","
+
+         file-type precision child-attainment 2
+         file-type ","
+
+         file-type strategy
+         file-type ","
+
+         ifelse(have-moved)
+         [ file-print 1 ]
+         [ file-print 0 ]
+       ]
+
+
+
+       [
+         file-type -1
+         file-type ","
+         file-type -1
+         file-type ","
+         file-type -1
+         file-type ","
+         file-type -1
+         file-type ","
+         file-type -1
+         file-type ","
+         file-type -1
+         file-type ","
+         file-type -1
+         file-type ","
+         file-print -1
+       ]
+    ]
+
+    file-close
+
+    ;file-open "World_SummaryData.csv"
+
+    set dummy "World_SummaryData_Exp"
+    set filename (word dummy exp-index suffix)
+    file-open filename
+
+    file-type ticks
+    file-type ","
+    file-type mean [GCSE-score] of schools
+    file-type ","
+    file-type ((max [GCSE-score] of schools) - (min [GCSE-score] of schools))
+    file-type ","
+    file-type mean [app-ratio] of schools
+    file-type ","
+    file-type ((max [app-ratio] of schools) - (min [app-ratio] of schools))
+    file-type ","
+    file-type asp-moran-i
+    file-type ","
+    file-type asp-moran-i-p
+    file-type ","
+    file-type att-moran-i
+    file-type ","
+    file-type att-moran-i-p
+    file-type ","
+    file-type GA-m
+    file-type ","
+    file-type GA-r
+    file-type ","
+    file-type GA-p
+    file-type ","
+    file-type GMx-m
+    file-type ","
+    file-type GMx-r
+    file-type ","
+    file-type GMx-p
+    file-type ","
+    file-type GMn-m
+    file-type ","
+    file-type GMn-r
+    file-type ","
+    file-type GMn-p
+    file-type ","
+    file-type AMx-m
+    file-type ","
+    file-type AMx-r
+    file-type ","
+    file-type AMx-p
+    file-type ","
+    file-type AMn-m
+    file-type ","
+    file-type AMn-r
+    file-type ","
+    file-print AMn-p
+
+    file-close
+
+end
+
+
+to ExportSummaryData_header
+
+  show "Exporting summary data"
+
+  let dummy "Schools_SummaryData_Exp"
+  let suffix ".csv"
+  let filename (word dummy exp-index suffix)
+  file-open filename
+  write-experiment-data
+  file-print "Tick,School_id,school-type,school-x-cor,school-y-cor,all-pupils,Value-Added,GCSE-score,App-ratio,max-distance_y7,max-distance_y11,max-distance_unallocated,mean-distance_y7,mean-distance_y11,mean-distance_unallocated,mean-aspiration_y7,mean-aspiration_y11,mean-aspiration_unallocated,mean-attainment_y7,mean-attainment_y11,parents_rank1_y7,parents_rank2_y7,parents_rank3_y7,parents_rank4_y7,parents_rank5_y7,parents_rank6_y7,parents_unranked_y7,success-aspiration_y7,success-attainment_y11,parents_avoiding_y7,parents_moved_y7,mean-attainment_change_y11,count-attainment_change+_y11,count-attainment_change-_y11,parents_strategy1_y7,parents_strategy2_y7,parents_strategy3_y7,parents_strategy4_y7,parents_strategy5_y7,parents_strategy6_y7,parents_strategy7_y7,parents_strategy8_y7"
+  file-close
+
+  set dummy "Parents_Data_Exp"
+  set filename (word dummy exp-index suffix)
+  file-open filename
+  file-print word "Date/time: " date-and-time
+  file-print "Tick,parent,x-cor,y-cor,aspiration,child-age,allocated-school,allocated-distance,preferred-school,allocated-rank,success-rank1,child-attainment,strategy,have-moved"
+  file-close
+
+  set dummy "World_SummaryData_Exp"
+  set filename (word dummy exp-index suffix)
+  file-open filename
+  write-experiment-data
+  file-print "Tick,MeanGCSE,RangeGCSE,MeanAppRatio,RangeAppRatio,asp-moran-i,asp-moran-i-p,pv-moran-i,pv-moran-i-p,GA-m,GA-r,GA-p,GMx-m,GMx-r,GMx-p,GMn-m,GMn-r,GMn-p,AMx-m,AMx-r,AMx-p,AMn-m,AMn-r,AMn-p"
+  file-close
+
+end
+
+
+
+to write-experiment-data
+
+  ;FILE MUST ALREADY BE OPEN!
+  file-print word "Date/time: " date-and-time
+  file-print word "seed," seed
+  ;file-print word "Families," Families
+  file-print word "Parent-Memory," Parent-Memory
+  file-print word "SchoolSize," 100
+  file-print word "Number-of-Schools," 10
+  file-print word "Departure-Probability," 1
+  file-print word "Number-of-Ranks," Number-of-Ranks
+  ;file-print word "Random-Schools," Random-Schools
+  ;file-print word "Min-School-Spacing," Min-School-Spacing
+  file-print word "Initial-School-GCSE-Distribution," Initial-School-GCSE-Distribution
+  file-print word "School-Value-Added," School-Value-Added
+  ;file-print word "Parent-Aspiration-Distribution," Parent-Aspiration-Distribution
+  ;file-print word "Aspiration-Mean," Aspiration-Mean
+  file-print word "School-Value-Added-Distribution," School-Value-Added-Distribution
+  file-print word "Location-Rules," Location-Rules
+  file-print word "Move-Closest," Move-Closest
+  file-print word "Avoid-Schools," Avoid-Schools
+  file-print word "Avoided-Threshold," Avoided-Threshold
+  file-print word "School-Peer-Effect," School-Peer-Effect
+  ;file-print word "School-Quality-Effect," School-Quality-Effect
+  file-print word "Parent-Effect," Parent-Effect
+  ;file-print word "Attainment=Aspiration?," attainment=aspiration?
+
+end
+
+
+to ExportWorldData
+
+  show "Exporting world data"
+
+  let dummy "World_Exp"
+  let filename (word dummy exp-index "_Tick" ticks ".csv")
+  export-world filename
+
+  ;let cmd (word "C:\\Program Files\\WinRAR\\WinRAR.exe\" A -dr -ep -ibck " directory "\\" "World_tick" ticks ".rar " directory "\\" filename)
+  ;show cmd
+  ;show shell:exec cmd
+
+end
+
+
+to ExportWorldData_initial
+
+  show "Exporting world data"
+  let filename (word "World_Exp" exp-index "_Tick_initial.csv")
+  export-world filename
+
+  ;let cmd (word "C:\\Program Files\\WinRAR\\WinRAR.exe\" A -dr -ep -ibck " directory "\\" "World_tick_initial.rar " directory "\\" filename)
+  ;show cmd
+  ;show shell:exec cmd
+
+end
+
+
+
+
+to export-worldview
+
+  show "Exporting world view"
+  let filename (word "WorldView_Exp" exp-index "_Tick" ticks ".png")
+  export-view filename
+
+end
 
 
 ;;----------------------------------
@@ -2685,8 +2633,8 @@ end
 GRAPHICS-WINDOW
 188
 10
-907
-730
+926
+749
 -1
 -1
 5.3504
@@ -2696,13 +2644,13 @@ GRAPHICS-WINDOW
 1
 1
 0
+0
+0
 1
-1
-1
--66
-66
--66
-66
+-68
+68
+-68
+68
 0
 0
 1
@@ -2939,9 +2887,9 @@ Patch-Value
 -1000
 
 CHOOSER
-1357
+1396
 132
-1549
+1588
 177
 Parent-Colours
 Parent-Colours
@@ -2965,7 +2913,7 @@ SWITCH
 1044
 Show-Unallocated
 Show-Unallocated
-1
+0
 1
 -1000
 
@@ -3047,9 +2995,9 @@ Ordered-Plots
 -1000
 
 PLOT
-938
+977
 14
-1137
+1176
 169
 MaxDistance-GCSE
 GCSE-score
@@ -3066,9 +3014,9 @@ PENS
 "mean" 1.0 2 -16777216 true "" ""
 
 PLOT
-938
+977
 177
-1138
+1177
 327
 AppRatio-GCSE
 GCSE-score
@@ -3084,9 +3032,9 @@ PENS
 "default" 1.0 2 -16777216 true "" ""
 
 PLOT
-939
+978
 338
-1139
+1178
 488
 GCSE-scores
 NIL
@@ -3102,9 +3050,9 @@ PENS
 "s" 1.0 1 -16777216 true "" ""
 
 PLOT
-1154
+1193
 14
-1354
+1393
 164
 MaxDistance-App
 AppRatio
@@ -3120,9 +3068,9 @@ PENS
 "default" 1.0 2 -16777216 true "" ""
 
 PLOT
-1154
+1193
 177
-1354
+1393
 327
 AppRatio-ValueAdded
 AppRatio
@@ -3138,9 +3086,9 @@ PENS
 "default" 1.0 2 -16777216 true "" ""
 
 PLOT
-1156
+1195
 338
-1356
+1395
 488
 Application-Ratio
 NIL
@@ -3156,9 +3104,9 @@ PENS
 "s" 1.0 1 -16777216 true "" ""
 
 MONITOR
-939
+978
 517
-1032
+1071
 570
 Mean GCSE
 mean [GCSE-score] of schools
@@ -3167,9 +3115,9 @@ mean [GCSE-score] of schools
 13
 
 MONITOR
-1048
+1087
 516
-1146
+1185
 569
 Range GCSE
 (max [GCSE-score] of schools) - (min [GCSE-score] of schools)
@@ -3178,9 +3126,9 @@ Range GCSE
 13
 
 MONITOR
-1162
+1201
 517
-1260
+1299
 570
 Mean App-ratio
 mean [app-ratio] of schools
@@ -3189,9 +3137,9 @@ mean [app-ratio] of schools
 13
 
 MONITOR
-1268
+1307
 516
-1381
+1420
 569
 Range App-ratio
 (max [app-ratio] of schools) - (min [app-ratio] of schools)
@@ -3200,9 +3148,9 @@ Range App-ratio
 13
 
 BUTTON
-1389
+1428
 32
-1513
+1552
 65
 Update Display
 update-Colours
@@ -3217,9 +3165,9 @@ NIL
 1
 
 SWITCH
-1390
+1429
 84
-1511
+1550
 117
 Move-Best
 Move-Best
@@ -3228,20 +3176,20 @@ Move-Best
 -1000
 
 SWITCH
-1360
+1399
 189
-1493
+1532
 222
 calc-Moran?
 calc-Moran?
-0
+1
 1
 -1000
 
 SWITCH
-1362
+1401
 237
-1559
+1598
 270
 Export-Summary-Data
 Export-Summary-Data
@@ -3250,9 +3198,9 @@ Export-Summary-Data
 -1000
 
 SWITCH
-1362
+1401
 285
-1537
+1576
 318
 Export-World-Data
 Export-World-Data
@@ -3261,13 +3209,13 @@ Export-World-Data
 -1000
 
 SWITCH
-1363
+1402
 334
-1504
+1543
 367
 Export-Movie
 Export-Movie
-0
+1
 1
 -1000
 
