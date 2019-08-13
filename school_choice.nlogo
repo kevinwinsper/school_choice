@@ -1466,7 +1466,7 @@ to update-Colours
 ;        let norm-hhold-income (hhold-income - min-hhold-income) / (max-hhold-income - min-hhold-income)
 ;        set color (norm-hhold-income * 5) + 15
 ;        ;set color (norm-hhold-income * 10) + 10
-        set color (hhold-income / 12000) + 10
+        set color (hhold-income / 13000) + 10
         if (color > 19.9) [set color 19.9]
       ]
 
@@ -2389,6 +2389,8 @@ to ExportSummaryData
 
     file-close
 
+
+
     ;file-open "Parents_Data.csv"
 
     set dummy "Parents_Data_Exp"
@@ -2441,13 +2443,24 @@ to ExportSummaryData
          file-type ","
 
          ifelse(have-moved)
-         [ file-print 1 ]
-         [ file-print 0 ]
+         [
+           file-type 1
+           file-type ","
+         ]
+         [
+           file-type 0
+           file-type ","
+         ]
+
+         file-print precision hhold-income 2
+
        ]
 
 
 
        [
+         file-type -1
+         file-type ","
          file-type -1
          file-type ","
          file-type -1
@@ -2543,7 +2556,7 @@ to ExportSummaryData_header
   set filename (word dummy exp-index suffix)
   file-open filename
   file-print word "Date/time: " date-and-time
-  file-print "Tick,parent,x-cor,y-cor,aspiration,child-age,allocated-school,allocated-distance,preferred-school,allocated-rank,success-rank1,child-attainment,strategy,have-moved"
+  file-print "Tick,parent,x-cor,y-cor,aspiration,child-age,allocated-school,allocated-distance,preferred-school,allocated-rank,success-rank1,child-attainment,strategy,have-moved,hhold-income"
   file-close
 
   set dummy "World_SummaryData_Exp"
@@ -3193,7 +3206,7 @@ SWITCH
 270
 Export-Summary-Data
 Export-Summary-Data
-1
+0
 1
 -1000
 
