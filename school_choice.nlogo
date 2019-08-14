@@ -1,4 +1,4 @@
-extensions [ gis R vid ]
+extensions [ gis R vid shell ]
 
 globals [ lbbd-msoa lbbd-lsoa lbbd-schools schoolradii directory exp-index asp-moran-i asp-moran-i-p att-moran-i att-moran-i-p ga-m ga-r ga-p gmx-m gmx-r gmx-p gmn-m gmn-r gmn-p amx-m amx-r amx-p amn-m amn-r amn-p _recording-save-file-name]
 
@@ -108,7 +108,7 @@ end
 
 to setup-map
 
-  set lbbd-msoa gis:load-dataset "data/LBBD_MSOA_HI.shp"
+  set lbbd-msoa gis:load-dataset "/Users/kevinwinsper/LocalDoc/GitHub/school_choice/data/LBBD_MSOA_HI.shp"
   gis:set-world-envelope (gis:envelope-of lbbd-msoa)
   gis:set-drawing-color white
   gis:draw lbbd-msoa 1
@@ -136,7 +136,7 @@ to setup-Parents
           set hhold-income log-normal mean-income 4500
 
           set aspiration -1
-          while [aspiration < 30 or aspiration > 100]
+          while [aspiration < 0 or aspiration > 100]
           [
             set aspiration random-normal 50 20
           ]
@@ -172,7 +172,7 @@ end
 to setup-Schools
   print "setting up schools"
 
-  set lbbd-schools gis:load-dataset "data/LBBD_secondary.shp"
+  set lbbd-schools gis:load-dataset "/Users/kevinwinsper/LocalDoc/GitHub/school_choice/data/LBBD_secondary.shp"
   foreach gis:feature-list-of lbbd-schools [ feature ->
     ask patches gis:intersecting feature [
       set plabel 1
@@ -279,6 +279,26 @@ to go
       if(Export-Summary-Data or Export-World-Data or Export-Movie)
       [
         ;create a new directory for this model run
+        set directory "/Users/kevinwinsper/LocalDoc/GitHub/school_choice/export"
+        set-current-directory directory
+        shell:cd directory
+        print directory
+        print shell:pwd
+
+        ;create a dummy file to check what new name to give the directory (checked in next-index procedure)
+        let dummy "Experiment"
+        let suffix ".txt"
+        set exp-index next-index dummy suffix
+        let filename (word shell:pwd "/" dummy exp-index suffix)
+        file-open filename
+        write-experiment-data
+        file-close
+
+        ;set the new directory name and create
+        set directory (word shell:pwd "/" dummy exp-index) ;set
+        show(shell:exec "mkdir" directory) ;create
+        set-current-directory directory ;update
+        shell:cd directory ;update
 
       ]
 
@@ -1002,7 +1022,7 @@ to add-NewParents
           ask parents-here
           [
             set hhold-income log-normal mean-income 4500
-            while [aspiration < 30 or aspiration > 100]
+            while [aspiration < 0 or aspiration > 100]
               [
                 set aspiration random-normal 50 20
               ]
@@ -1054,7 +1074,7 @@ to add-NewParents
           ask parents-here
           [
             set hhold-income house-price-here / (Price-Income-Ratio - 0.5)
-            while [aspiration < 30 or aspiration > 100]
+            while [aspiration < 0 or aspiration > 100]
               [
                 set aspiration random-normal 50 20
               ]
@@ -2646,8 +2666,8 @@ end
 GRAPHICS-WINDOW
 188
 10
-926
-749
+929
+752
 -1
 -1
 5.3504
@@ -2696,7 +2716,7 @@ seed
 seed
 0
 1000
-818.0
+182.0
 1
 1
 NIL
@@ -2907,7 +2927,7 @@ CHOOSER
 Parent-Colours
 Parent-Colours
 "satisfaction" "school" "aspiration" "attainment" "attainment-change" "moved" "best school allocation" "worst school allocation" "strategy" "age" "allocated-distance" "household income"
-11
+5
 
 CHOOSER
 24
