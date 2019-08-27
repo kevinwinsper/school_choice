@@ -12,15 +12,15 @@ largePVal.count = 0
 largePVal.count2 = 0
 largePVal.count3 = 0
 
-check <- seq(from = 0, to = 24, by = 1)
+check <- seq(from = 105, to = 114, by = 1)
 
-#for(i in 1:length(check))
-for(i in 0:24)
+for(i in check[1]:check[10])
 {
   dat <- read.csv(paste(pathname, exp, i, "/Schools_SummaryData_Exp", i, ".csv", sep =""), skip = 16, header = T)
   for (t in 20:99)
   {
     subdat <- dat[dat$Tick == t, c("Tick","School_id","GCSE.score","App.ratio","max.distance_y7","max.distance_y11")]
+    
     lm <- lm(subdat$GCSE.score~subdat$App.ratio)
     if(summary(lm)$coefficients[2,4] > 0.05){
       largePVal.count = largePVal.count + 1

@@ -1,6 +1,6 @@
 extensions [ gis R vid shell ]
 
-globals [ lbbd-msoa lbbd-lsoa lbbd-schools schoolradii directory exp-index asp-moran-i asp-moran-i-p att-moran-i att-moran-i-p ga-m ga-r ga-p gmx-m gmx-r gmx-p gmn-m gmn-r gmn-p amx-m amx-r amx-p amn-m amn-r amn-p _recording-save-file-name]
+globals [ lbbd-msoa lbbd-lsoa lbbd-schools schoolradii directory exp-index asp-moran-i asp-moran-i-p att-moran-i att-moran-i-p inc-moran-i inc-moran-i-p ga-m ga-r ga-p gmx-m gmx-r gmx-p gmn-m gmn-r gmn-p amx-m amx-r amx-p amn-m amn-r amn-p _recording-save-file-name]
 
 breed [parents parent]
 breed [schools school]
@@ -15,7 +15,7 @@ parents-own
   allocated-distance ;distance to allocated school
   aspiration ;aspiration level of parent
 
-  hhold-income ;household income
+  hhold-income ;household income of parent
 
   success-by-rank  ;rank of allocated school (1 is top rank, i.e. most preferred)
   success-rank1  ;true if allocated to top-ranked school, else false (or -1 if not allocated)
@@ -75,16 +75,19 @@ schools-own
 
 patches-own
 [
-  centroid
-  ;ID
-  msoa
-  mean-house-price
-  house-price
-  within-lbbd
-  mean-hhold-income
-  original-price
-  current-price
-  price-updated
+  centroid ;centroid of msoa
+  msoa ;msoa that the patch belongs to
+  mean-house-price ;mean house price of the msoa that the patch belongs to
+  house-price ;value of the house
+  within-lbbd ;whether the patch is within lbbd boundary
+  mean-hhold-income ;mean household income of the msoa that the patch belongs to
+  original-price ;orginal price of the house at model initialisation
+  current-price ;current price of the house at model initialisation
+  price-updated ;whether the price has been updated
+  p-aspiration ;aspiration of the parent on the patch
+  p-attainment ;attainment of the parent on the patch
+  p-hhold-income ;household income of the parent on the patch
+  location-value
 ]
 
 ;;----------------------------------
@@ -94,13 +97,13 @@ patches-own
 to setup
 
   clear-all
-  ;if(calc-Moran?) [ setup-R ]
   random-seed seed
 
   setup-map
   setup-Patches
   setup-Schools
   setup-Parents
+  if(calc-Moran?) [ setup-R ]
   reset-ticks
   plotting
 
@@ -136,7 +139,7 @@ to setup-Parents
           set hhold-income log-normal mean-income 4500
 
           set aspiration -1
-          while [aspiration < 0 or aspiration > 100]
+          while [aspiration < 30 or aspiration > 100]
           [
             set aspiration random-normal 50 20
           ]
@@ -200,7 +203,7 @@ to setup-Schools
             while [value-added < -1 or value-added > 1 ]
             [
               if(School-Value-Added-Distribution = "uniform") [ set value-added 0.1 ]
-              if(School-Value-Added-Distribution = "normal") [ set value-added random-normal 0 0.2 ]
+              if(School-Value-Added-Distribution = "normal") [ set value-added random-normal 0 0.3 ]
 
               if(value-added < 0) [ set value-added (value-added * -1) ] ;do not allow value-added to be negative
 
@@ -215,7 +218,7 @@ to setup-Schools
           set y10Parents []
           set y11Parents []
 
-          set places 100
+          set places SchoolSize
           set id (count schools - 1)      ;first school has id of zero
           set color (count schools - 1) * 10 + 15  ;first school will be red
                                                      ;set size 0
@@ -230,6 +233,17 @@ to setup-Schools
       ]
     ]
   ]
+  ; code to relocate school 3
+  let newLocation3 patch 16 -49
+  let newLocation9 patch -45 -34
+;  ask school 3
+;  [
+;    move-to newLocation3
+;  ]
+;  ask school 9
+;  [
+;    move-to newLocation9
+;  ]
 
 end
 
@@ -315,6 +329,7 @@ to go
 
     ask parents [set-parent-school-distance]
     set-SchoolCatchments
+    calc-mean-catchment-price
     rank-Schools
     move
   ]
@@ -325,7 +340,8 @@ to go
   age-PupilCohorts ;move cohorts of students up one year
   add-NewParents ;add new parents for this tick
   set-schoolCatchments ;find patches in catchment available to move into this tick (do this after adding new parents)
-  update-HousePrice
+  update-HousePrice ;update house price
+  calc-mean-catchment-price ;calculate mean house price of houses in each schools catchment area
 
 
   show "Parents ranking schools"
@@ -337,7 +353,7 @@ to go
   show "Moving agents"
   move ;parents with child-age = 9 potentially move to a better location
 
-;  set-patch-attributes
+  if(ticks > 80 and calc-Moran? = true) [set-patch-attributes]
 
   show "Updating Schools"
   calc-catchment-size  ;schools calculate mean and max allocated distance of their parents
@@ -353,7 +369,7 @@ to go
 
     if(Export-Summary-Data)
     [
-      ;calc-Moran
+      calc-Moran
       ;calc-relationships
       ExportSummaryData
     ]
@@ -378,6 +394,7 @@ to go
 
 end
 
+;update house price of each patch
 to update-HousePrice
   let tempSchools sort-by [ [?1 ?2] -> [GCSE-score] of ?1 > [GCSE-score] of ?2 ] schools
   let thisRank 0
@@ -428,7 +445,7 @@ to update-HousePrice
           [
             ask patch-set tempPatches
             [
-              set current-price current-price * 1.01
+              set current-price current-price * 1.005
               set price-updated true
             ]
           ]
@@ -439,7 +456,7 @@ to update-HousePrice
   ]
   ask patches with [within-lbbd = true and price-updated = false]
   [
-    set current-price current-price * 1.005
+    set current-price current-price * 1.01
     set price-updated true
   ]
 
@@ -455,13 +472,29 @@ to set-SchoolCatchments
     [
       set catchmentPatches []
       set catchmentPatches sort patches with [ distance myself < min [ mean-distances ] of myself and not any? turtles-here and within-lbbd = true ]
+    ]
+  ]
 
+  [
+    ask schools
+    [
+      set catchmentPatches []
+      set catchmentPatches sort patches with [ distance myself < (2 * world-width) and not any? turtles-here and within-lbbd = true ]
+    ]
+  ]
+end
+
+to calc-mean-catchment-price
+  ifelse(ticks > 0)
+  [
+    ask schools
+    [
       ifelse(empty? catchmentPatches)
       [
-        set mean-catchment-price 1000000  ;if places were allocated find the mean distance of allocated parents
+        set mean-catchment-price 1500000  ;if places were allocated find the mean distance of allocated parents
       ]
       [
-        set mean-catchment-price mean [house-price] of patches with [ distance myself < min [ mean-distances ] of myself and not any? turtles-here and within-lbbd = true ] ;if places were allocated find the mean distance of allocated parents
+        set mean-catchment-price mean [current-price] of patches with [ distance myself < min [ mean-distances ] of myself and not any? turtles-here and within-lbbd = true ] ;if places were allocated find the mean distance of allocated parents
       ]
       set mean-catchment-prices lput mean-catchment-price mean-catchment-prices ;add the mean distance to the list of mean distances
       if(length mean-catchment-prices > Parent-Memory) [ set mean-catchment-prices remove-item 0 mean-catchment-prices ]  ;only keep track of last *Memory* years distances
@@ -471,16 +504,13 @@ to set-SchoolCatchments
   [
     ask schools
     [
-      set catchmentPatches []
-      set catchmentPatches sort patches with [ distance myself < (2 * world-width) and not any? turtles-here and within-lbbd = true ]
-
       set mean-catchment-prices []
       ifelse(not empty? catchmentPatches)
       [
-        set mean-catchment-price 1000000  ;if places were allocated find the mean distance of allocated parents
+        set mean-catchment-price 1500000  ;if places were allocated find the mean distance of allocated parents
       ]
       [
-        set mean-catchment-price mean [house-price] of patches with [ distance myself < min [ mean-distances ] of myself and not any? turtles-here and within-lbbd = true ] ;if places were allocated find the mean distance of allocated parents
+        set mean-catchment-price mean [current-price] of patches with [ distance myself < (2 * world-width) and not any? turtles-here and within-lbbd = true ] ;if places were allocated find the mean distance of allocated parents
       ]
       set mean-catchment-prices lput mean-catchment-price mean-catchment-prices ;add the mean distance to the list of mean distances
       if(length mean-catchment-prices > Parent-Memory) [ set mean-catchment-prices remove-item 0 mean-catchment-prices ]  ;only keep track of last *Memory* years distances
@@ -927,7 +957,8 @@ to move
           set have-moved true
           ask(initialHome)
           [
-            ;set-patchValue ;this works because parent can only move once.
+
+            if(ticks > 80 and calc-Moran? = true) [ set-location-value ] ;this works because parent can only move once.
             if(any? parents-here) [ show "error - still a parent here!" ]
           ]
         ]
@@ -1011,77 +1042,22 @@ to add-NewParents
   [
     let sprouting-patch nobody
 
-    ifelse(Location-Rules = false)  ;if new parents can be located randomly on the grid
+    ask one-of patches with [within-lbbd = true]
     [
-      ask one-of patches with [within-lbbd = true]
+      if(not any? turtles-here)
       [
-        if(not any? turtles-here)
+        let house-price-here [current-price] of self
+        create-parent
+        ask parents-here
         [
-          let mean-income [mean-hhold-income] of self
-          create-parent
-          ask parents-here
-          [
-            set hhold-income log-normal mean-income 4500
-            while [aspiration < 0 or aspiration > 100]
-              [
-                set aspiration random-normal 50 20
-              ]
-            set child-attainment aspiration
-          ]
-          set addedParents addedParents + 1
+          set hhold-income house-price-here / (Price-Income-Ratio - 0.5)
+          while [aspiration < 0 or aspiration > 100]
+            [
+              set aspiration random-normal 50 20
+            ]
+          set child-attainment aspiration
         ]
-      ]
-    ]
-
-    ;otherwise only allow parents to move to patches with patchValue lower than their aspiration
-    [
-;      foreach gis:feature-list-of lbbd-msoa [ feature ->
-;        let addedParentsWithinMSOA 0
-;        while [ addedParentsWithinMSOA < 1000 / 22]
-;        [
-;          ask patch 0 0 [ create-parent ]
-;          let mean-income gis:property-value feature "HHOLDINC"
-;          ask parents-on patch 0 0
-;          [
-;            while [aspiration < 0 or aspiration > 100]
-;              [
-;                set aspiration random-normal 50 20
-;              ]
-;            set child-attainment aspiration
-;
-;            set hhold-income log-normal mean-income 4500
-;            let newPatch patch-here
-;            let houseValue-max mean-income * Price-Income-Ratio
-;            set newPatch max-one-of patches with [not any? turtles-here and within-lbbd = true and house-price < houseValue-max] [house-price]
-;            if(newPatch = nobody) [
-;              set newPatch min-one-of patches with [not any? turtles-here and within-lbbd = true] [house-price]
-;              show "failed to find house for new parent"
-;              show hhold-income
-;            ]
-;            move-to newPatch
-;            set initialHome newPatch
-;          ]
-;          set addedParentsWithinMSOA addedParentsWithinMSOA + 1
-;          set addedParents addedParents + 1
-;        ]
-;      ]
-      ask one-of patches with [within-lbbd = true]
-      [
-        if(not any? turtles-here)
-        [
-          let house-price-here [current-price] of self
-          create-parent
-          ask parents-here
-          [
-            set hhold-income house-price-here / (Price-Income-Ratio - 0.5)
-            while [aspiration < 0 or aspiration > 100]
-              [
-                set aspiration random-normal 50 20
-              ]
-            set child-attainment aspiration
-          ]
-          set addedParents addedParents + 1
-        ]
+        set addedParents addedParents + 1
       ]
     ]
 
@@ -1100,13 +1076,8 @@ to create-parent
        facexy 0 0
 
        set aspiration -1
-;       while [aspiration < 0 or aspiration > 100]
-;       [
-;         set aspiration random-normal 50 20
-;       ]
-       set child-attainment aspiration
 
-       ;set hhold-income log-normal gis:property-value feature "HHOLDINC" 4500
+       set child-attainment aspiration
 
        set child-age 9
 
@@ -1390,6 +1361,84 @@ to set-child-attainment [ yParents ]
 
 end
 
+to set-patch-attributes ;for ALL patches
+
+  ask patches
+  [
+    set location-value 0
+    set p-aspiration 0
+    set p-attainment 0
+    set p-hhold-income 0
+  ]
+
+  ask patches
+  [
+;    ifelse(School-Quality-Effect > 0)
+;    [
+;      let nearestSchools sort-by [ [?1 ?2] -> [distance myself] of ?1 < [distance myself] of ?2 ] schools
+;      let schoolValue [GCSE-score] of first nearestSchools
+;
+;      let dist distance first nearestSchools
+;
+;      ifelse(dist < (schoolRadii * 2))
+;      [ set schoolValue (1 - ( dist / (schoolRadii * 2))^ 0.5) * schoolValue ]
+;      [ set schoolValue 0 ]
+;
+;      ifelse(any? parents-on neighbors)
+;      [ set location-value ((mean [aspiration] of parents-on neighbors) * (1 - School-Quality-Effect)) + (schoolValue * School-Quality-Effect) ]
+;      [ set location-value 0 + (schoolValue * School-Quality-Effect) ]
+;    ]
+
+;    [
+      if(any? parents-on neighbors) [ set location-value mean [hhold-income] of parents-on neighbors ]
+;    ]
+  ]
+
+  ask patches with [location-value = 0]
+  [
+    print "zero location-value on neighbours"
+    set location-value mean [location-value] of neighbors
+  ]
+
+  ask patches with [any? parents-here ]
+  [
+    set p-aspiration mean [aspiration] of parents-here        ;use mean to prevent run time error when checking patches without parents below
+    set p-attainment mean [child-attainment] of parents-here  ;use mean to prevent run time error when checking patches without parents below
+    set p-hhold-income mean [hhold-income] of parents-here
+  ]
+
+  ask patches with [not any? parents-here] [ set p-aspiration mean [p-aspiration] of neighbors ]
+  ask patches with [not any? parents-here] [ set p-attainment mean [p-attainment] of neighbors ]
+  ask patches with [not any? parents-here] [ set p-hhold-income mean [p-hhold-income] of neighbors ]
+
+end
+
+to set-location-value  ;for a SINGLE patch
+
+;  ifelse(School-Quality-Effect > 0)
+;  [
+;    let nearestSchools sort-by [[distance myself] of ?1 < [distance myself] of ?2] schools
+;    let schoolValue [GCSE-score] of first nearestSchools
+;
+;    let dist distance first nearestSchools
+;
+;    ifelse(dist < (schoolRadii * 2))
+;    [ set schoolValue (1 - ( dist / (schoolRadii * 2))^ 0.5) * schoolValue ]
+;    [ set schoolValue 0 ]
+;
+;    ifelse(any? parents-on neighbors)
+;    [ set location-value ((mean [aspiration] of parents-on neighbors) * (1 - School-Quality-Effect)) + (schoolValue * School-Quality-Effect) ]
+;    [ set location-value 0 + (schoolValue * School-Quality-Effect) ]
+;  ]
+;
+;  [
+    ifelse(any? parents-on neighbors)
+    [ set location-value mean [hhold-income] of parents-on neighbors ]
+    [ set location-value mean [location-value] of neighbors ]
+;  ]
+
+end
+
 ;;----------------------------------
 ;;DISPLAY
 ;;----------------------------------
@@ -1486,7 +1535,7 @@ to update-Colours
 ;        let norm-hhold-income (hhold-income - min-hhold-income) / (max-hhold-income - min-hhold-income)
 ;        set color (norm-hhold-income * 5) + 15
 ;        ;set color (norm-hhold-income * 10) + 10
-        set color (hhold-income / 13000) + 10
+        set color (hhold-income / 20000) + 10
         if (color > 19.9) [set color 19.9]
       ]
 
@@ -1592,7 +1641,12 @@ to update-Colours
         set color (allocated-distance / 8) + 122
       ]
 
+      if(Parent-Colours = "none")
+      [
+        set color black
+      ]
     ]
+
 
     if(Show-Unallocated = false)
     [
@@ -1943,103 +1997,120 @@ end
 ;;----------------------------------
 ;;STATS
 ;;----------------------------------
-;to setup-R
-;
-;  print "setting up R"
-;
-;  r:clear
-;  r:eval("library(spdep)")
-;
-;  r:put "nrow" world-height
-;  r:put "ncol" world-width
-;
-;  let corner-d 100
-;
-;  ask patch max-pxcor max-pycor [ set corner-d distancexy min-pxcor min-pycor]
-;  ifelse(corner-d < 2)
-;  [ r:eval("grid.nb <- cell2nb(nrow, ncol, type='queen', torus=TRUE)") ]
-;  [ r:eval("grid.nb <- cell2nb(nrow, ncol, type='queen', torus=FALSE)") ]
-;
-;  r:eval("grid.listw <- nb2listw(grid.nb, style='C')")
-;
-;  set asp-moran-i 0
-;  set asp-moran-i-p 0
-;  set att-moran-i 0
-;  set att-moran-i-p 0
-;
-;  set GA-m 0
-;  set GA-r 0
-;  set GA-p 0
-;
-;  set GMx-m 0
-;  set GMx-r 0
-;  set GMx-p 0
-;
-;  set GMn-m 0
-;  set GMn-r 0
-;  set GMn-p 0
-;
-;  set AMx-m 0
-;  set AMx-r 0
-;  set AMx-p 0
-;
-;  set AMn-m 0
-;  set AMn-r 0
-;  set AMn-p 0
-;
-;end
-;
-;
-;to calc-Moran
-;
-;;17Jul12
-;;need to use patch attribute values for spatial autocorrelation (b/c using cell2nb in R to deal with toroid)
-;  ifelse(calc-Moran? and ticks >= 20) ;ticks >= 20 to speed execution time for analysis
-;  [
-;    print "calc Moran's I (R)"
-;
-;    aspiration
-;    r:put "p.aspiration" map [[p-aspiration] of ?] sort patches
-;    print map [[p-aspiration] of ?] sort patches
-;
-;    r:eval("asp.i <- moran.test(p.aspiration, grid.listw)")
-;
-;    set asp-moran-i r:get("asp.i$estimate[1]")
-;    set asp-moran-i-p r:get("asp.i$p.value")
-;
-;    print word "Moran's i (aspiration): " asp-moran-i
-;    print word "Moran's i, p-value: " asp-moran-i-p
-;
-;    r:setPlotDevice
-;    r:eval("moran.plot(p.aspiration, grid.listw)")
+to setup-R
+
+  print "setting up R"
+
+  r:clear
+  r:eval("library(spdep)")
+
+  r:eval("x <- c()")
+  r:eval("y <- c()")
+
+  ask patches with [within-lbbd = true]
+  [
+    let px [pxcor] of self
+    let py [pycor] of self
+
+    r:put "px" px
+    r:put "py" py
+    r:eval("y <- c(y,py)")
+
+    r:eval("x <- c(x,px)")
+    r:eval("y <- c(y,py)")
+  ]
+  r:eval("xy <- expand.grid(x, y)")
+
+  r:eval("grid.nb <- tri2nb(xy)")
+
+  r:eval("grid.listw <- nb2listw(grid.nb, style='C')")
+
+  set asp-moran-i 0
+  set asp-moran-i-p 0
+  set att-moran-i 0
+  set att-moran-i-p 0
+  set inc-moran-i 0
+  set inc-moran-i-p 0
+
+  set GA-m 0
+  set GA-r 0
+  set GA-p 0
+
+  set GMx-m 0
+  set GMx-r 0
+  set GMx-p 0
+
+  set GMn-m 0
+  set GMn-r 0
+  set GMn-p 0
+
+  set AMx-m 0
+  set AMx-r 0
+  set AMx-p 0
+
+  set AMn-m 0
+  set AMn-r 0
+  set AMn-p 0
+
+end
 ;
 ;
-;    attain
-;    r:put "p.attainment" map [[p-attainment] of ?] sort patches
-;    print map [[p-attainment] of ?] sort patches
+to calc-Moran
+
+;17Jul12
+;need to use patch attribute values for spatial autocorrelation (b/c using cell2nb in R to deal with toroid)
+  ifelse(calc-Moran? and ticks > 0) ;ticks >= 20 to speed execution time for analysis
+  [
+    print "calc Moran's I (R)"
+
+    ;aspiration
+    r:put "p.aspiration" map [ ?1 -> [p-aspiration] of ?1 ] sort patches with [within-lbbd = true]
+
+    r:eval("asp.i <- moran.test(p.aspiration, grid.listw)")
+
+    set asp-moran-i r:get("asp.i$estimate[1]")
+    set asp-moran-i-p r:get("asp.i$p.value")
+
+    print word "Moran's i (aspiration): " asp-moran-i
+    print word "Moran's i, p-value: " asp-moran-i-p
+
+    ;attainment
+    r:put "p.attainment" map [ ?1 -> [p-attainment] of ?1 ] sort patches with [within-lbbd = true]
+
+    r:eval("att.i <- moran.test(p.attainment, grid.listw)")
+
+    set att-moran-i r:get("att.i$estimate[1]")
+    set att-moran-i-p r:get("att.i$p.value")
+
+    print word "Moran's i (attainment): " att-moran-i
+    print word "Moran's i, p-value: " att-moran-i-p
+
+    ;income
+    r:put "p.hholdinc" map [ ?1 -> [p-hhold-income] of ?1 ] sort patches with [within-lbbd = true]
+
+    r:eval("inc.i <- moran.test(p.hholdinc, grid.listw)")
+
+    set inc-moran-i r:get("inc.i$estimate[1]")
+    set inc-moran-i-p r:get("inc.i$p.value")
+
+    print word "Moran's i (hhold-income): " inc-moran-i
+    print word "Moran's i, p-value: " inc-moran-i-p
+  ]
+
+  [
+    ;create dummy values
+    set asp-moran-i -99
+    set asp-moran-i-p -99
+
+    set att-moran-i -99
+    set att-moran-i-p -99
+
+    set inc-moran-i -99
+    set inc-moran-i-p -99
+  ]
+
+end
 ;
-;    r:eval("att.i <- moran.test(p.attainment, grid.listw)")
-;
-;    set att-moran-i r:get("att.i$estimate[1]")
-;    set att-moran-i-p r:get("att.i$p.value")
-;
-;    print word "Moran's i (attainment): " att-moran-i
-;    print word "Moran's i, p-value: " att-moran-i-p
-;
-;    r:setPlotDevice
-;    r:eval("moran.plot(p.attainment, grid.listw)")
-;  ]
-;
-;  [
-;    create dummy values
-;    set asp-moran-i -99
-;    set asp-moran-i-p -99
-;
-;    set att-moran-i -99
-;    set att-moran-i-p -99
-;  ]
-;
-;end
 ;
 ;
 ;
@@ -2047,46 +2118,45 @@ end
 ;
 ;
 ;
-;
-;to calc-relationships
-;
-;print "calc relationships (R)"
-;
-;r:put "sGCSEs" map [ [GCSE-score] of ? ] sort schools
-;r:put "sAppRatios" map [ [app-ratio] of ? ] sort schools
-;r:put "sMaxDists" map [ [max-distance] of ? ] sort schools
-;r:put "sMeanDists" map [ [mean-distance] of ? ] sort schools
-;
-;r:eval("dat <- cbind(sGCSEs, sAppRatios, sMaxDists, sMeanDists)")
-;r:eval("dat <- as.data.frame(dat)")
-;
-;r:eval("GCSEvsAppRatioLM <- lm(sGCSEs ~ sAppRatios, data = dat)")
-;r:eval("GCSEvsMaxDistLM <- lm(sGCSEs ~ sMaxDists, data = dat)")
-;r:eval("GCSEvsMeanDistLM <- lm(sGCSEs ~ sMeanDists, data = dat)")
-;r:eval("AppRatiovsMaxDistLM <- lm(sAppRatios ~ sMaxDists, data = dat)")
-;r:eval("AppRatiovsMeanDistLM <- lm(sAppRatios ~ sMeanDists, data = dat)")
-;
-;set GA-m r:get("summary(GCSEvsAppRatioLM)$coefficients[2]")
-;set GA-r r:get("summary(GCSEvsAppRatioLM)$r.squared")
-;set GA-p r:get("anova(GCSEvsAppRatioLM)$'Pr(>F)'[1]")
-;
-;set GMx-m r:get("summary(GCSEvsMaxDistLM)$coefficients[2]")
-;set GMx-r r:get("summary(GCSEvsMaxDistLM)$r.squared")
-;set GMx-p r:get("anova(GCSEvsMaxDistLM)$'Pr(>F)'[1]")
-;
-;set GMn-m r:get("summary(GCSEvsMeanDistLM)$coefficients[2]")
-;set GMn-r r:get("summary(GCSEvsMeanDistLM)$r.squared")
-;set GMn-p r:get("anova(GCSEvsMeanDistLM)$'Pr(>F)'[1]")
-;
-;set AMx-m r:get("summary(AppRatiovsMaxDistLM)$coefficients[2]")
-;set AMx-r r:get("summary(AppRatiovsMaxDistLM)$r.squared")
-;set AMx-p r:get("anova(AppRatiovsMaxDistLM)$'Pr(>F)'[1]")
-;
-;set AMn-m r:get("summary(AppRatiovsMeanDistLM)$coefficients[2]")
-;set AMn-r r:get("summary(AppRatiovsMeanDistLM)$r.squared")
-;set AMn-p r:get("anova(AppRatiovsMeanDistLM)$'Pr(>F)'[1]")
-;
-;end
+to calc-relationships
+
+print "calc relationships (R)"
+
+r:put "sGCSEs" map [ ?1 -> [GCSE-score] of ?1 ] sort schools
+r:put "sAppRatios" map [ ?1 -> [app-ratio] of ?1 ] sort schools
+r:put "sMaxDists" map [ ?1 -> [max-distance] of ?1 ] sort schools
+r:put "sMeanDists" map [ ?1 -> [mean-distance] of ?1 ] sort schools
+
+r:eval("dat <- cbind(sGCSEs, sAppRatios, sMaxDists, sMeanDists)")
+r:eval("dat <- as.data.frame(dat)")
+
+r:eval("GCSEvsAppRatioLM <- lm(sGCSEs ~ sAppRatios, data = dat)")
+r:eval("GCSEvsMaxDistLM <- lm(sGCSEs ~ sMaxDists, data = dat)")
+r:eval("GCSEvsMeanDistLM <- lm(sGCSEs ~ sMeanDists, data = dat)")
+r:eval("AppRatiovsMaxDistLM <- lm(sAppRatios ~ sMaxDists, data = dat)")
+r:eval("AppRatiovsMeanDistLM <- lm(sAppRatios ~ sMeanDists, data = dat)")
+
+set GA-m r:get("summary(GCSEvsAppRatioLM)$coefficients[2]")
+set GA-r r:get("summary(GCSEvsAppRatioLM)$r.squared")
+set GA-p r:get("anova(GCSEvsAppRatioLM)$'Pr(>F)'[1]")
+
+set GMx-m r:get("summary(GCSEvsMaxDistLM)$coefficients[2]")
+set GMx-r r:get("summary(GCSEvsMaxDistLM)$r.squared")
+set GMx-p r:get("anova(GCSEvsMaxDistLM)$'Pr(>F)'[1]")
+
+set GMn-m r:get("summary(GCSEvsMeanDistLM)$coefficients[2]")
+set GMn-r r:get("summary(GCSEvsMeanDistLM)$r.squared")
+set GMn-p r:get("anova(GCSEvsMeanDistLM)$'Pr(>F)'[1]")
+
+set AMx-m r:get("summary(AppRatiovsMaxDistLM)$coefficients[2]")
+set AMx-r r:get("summary(AppRatiovsMaxDistLM)$r.squared")
+set AMx-p r:get("anova(AppRatiovsMaxDistLM)$'Pr(>F)'[1]")
+
+set AMn-m r:get("summary(AppRatiovsMeanDistLM)$coefficients[2]")
+set AMn-r r:get("summary(AppRatiovsMeanDistLM)$r.squared")
+set AMn-p r:get("anova(AppRatiovsMeanDistLM)$'Pr(>F)'[1]")
+
+end
 
 ;;----------------------------------
 ;;DATA EXPORT
@@ -2525,6 +2595,10 @@ to ExportSummaryData
     file-type ","
     file-type att-moran-i-p
     file-type ","
+    file-type inc-moran-i
+    file-type ","
+    file-type inc-moran-i-p
+    file-type ","
     file-type GA-m
     file-type ","
     file-type GA-r
@@ -2597,7 +2671,7 @@ to write-experiment-data
   file-print word "seed," seed
   ;file-print word "Families," Families
   file-print word "Parent-Memory," Parent-Memory
-  file-print word "SchoolSize," 100
+  file-print word "SchoolSize," SchoolSize
   file-print word "Number-of-Schools," 10
   file-print word "Departure-Probability," 1
   file-print word "Number-of-Ranks," Number-of-Ranks
@@ -2608,7 +2682,7 @@ to write-experiment-data
   ;file-print word "Parent-Aspiration-Distribution," Parent-Aspiration-Distribution
   ;file-print word "Aspiration-Mean," Aspiration-Mean
   file-print word "School-Value-Added-Distribution," School-Value-Added-Distribution
-  file-print word "Location-Rules," Location-Rules
+  ;file-print word "Location-Rules," Location-Rules
   file-print word "Move-Closest," Move-Closest
   file-print word "Avoid-Schools," Avoid-Schools
   file-print word "Avoided-Threshold," Avoided-Threshold
@@ -2664,9 +2738,9 @@ end
 ;;----------------------------------
 @#$#@#$#@
 GRAPHICS-WINDOW
-188
+210
 10
-929
+951
 752
 -1
 -1
@@ -2706,21 +2780,6 @@ NIL
 NIL
 NIL
 1
-
-SLIDER
-18
-65
-110
-98
-seed
-seed
-0
-1000
-182.0
-1
-1
-NIL
-HORIZONTAL
 
 SLIDER
 18
@@ -2794,7 +2853,7 @@ Avoided-Threshold
 Avoided-Threshold
 0
 1
-0.65
+0.75
 0.05
 1
 NIL
@@ -2852,22 +2911,11 @@ Price-Income-Ratio
 NIL
 HORIZONTAL
 
-SWITCH
-14
-580
-164
-613
-Location-Rules
-Location-Rules
-0
-1
--1000
-
 SLIDER
-17
-684
-189
-717
+13
+632
+185
+665
 Parent-Memory
 Parent-Memory
 1
@@ -2879,10 +2927,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-17
-733
-189
-766
+13
+681
+185
+714
 School-Peer-Effect
 School-Peer-Effect
 0
@@ -2894,10 +2942,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-18
-781
-190
-814
+14
+729
+186
+762
 Parent-Effect
 Parent-Effect
 0
@@ -2909,10 +2957,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-21
-839
-152
-872
+17
+787
+148
+820
 Patch-Value
 Patch-Value
 1
@@ -2920,30 +2968,30 @@ Patch-Value
 -1000
 
 CHOOSER
-1396
-132
-1588
-177
+398
+767
+590
+812
 Parent-Colours
 Parent-Colours
-"satisfaction" "school" "aspiration" "attainment" "attainment-change" "moved" "best school allocation" "worst school allocation" "strategy" "age" "allocated-distance" "household income"
-5
+"satisfaction" "school" "aspiration" "attainment" "attainment-change" "moved" "best school allocation" "worst school allocation" "strategy" "age" "allocated-distance" "household income" "none"
+0
 
 CHOOSER
-24
-951
-162
-996
+398
+823
+536
+868
 Success-Type
 Success-Type
 "ranking" "aspiration" "attainment"
 0
 
 SWITCH
-24
-1011
-193
-1044
+401
+881
+570
+914
 Show-Unallocated
 Show-Unallocated
 0
@@ -2951,50 +2999,50 @@ Show-Unallocated
 -1000
 
 CHOOSER
-24
-1051
-162
-1096
+249
+820
+387
+865
 ChildAge
 ChildAge
 "All" "SchoolAge" ">16" "<9" "9" "10" "11" "12" "13" "14" "15" "16"
-0
+11
 
 CHOOSER
-24
-1103
-162
-1148
+249
+872
+387
+917
 DistanceClass
 DistanceClass
 "All" "0-10" "10-20" "20-30" "30-40" "40-50" "50-60" ">60"
 0
 
 CHOOSER
-24
-1156
-162
-1201
+249
+925
+387
+970
 AspirationClass
 AspirationClass
 "All" "0-10" "10-20" "20-30" "30-40" "40-50" "50-60" "60-70" "70-80" "80-90" "90-100"
 0
 
 CHOOSER
-23
-1211
-161
-1256
+248
+980
+386
+1025
 School-Colours
 School-Colours
 "id" "GCSE" "app-ratio" "value-added"
 1
 
 SWITCH
-24
-1263
-166
-1296
+249
+1032
+391
+1065
 Single-School
 Single-School
 1
@@ -3002,10 +3050,10 @@ Single-School
 -1000
 
 SLIDER
-25
-1307
-197
-1340
+250
+1076
+422
+1109
 Shown-School
 Shown-School
 0
@@ -3017,10 +3065,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-25
-1354
-171
-1387
+250
+1123
+396
+1156
 Ordered-Plots
 Ordered-Plots
 1
@@ -3031,7 +3079,7 @@ PLOT
 977
 14
 1176
-169
+164
 MaxDistance-GCSE
 GCSE-score
 max-distance
@@ -3181,10 +3229,10 @@ Range App-ratio
 13
 
 BUTTON
-1428
-32
-1552
-65
+252
+769
+376
+802
 Update Display
 update-Colours
 NIL
@@ -3198,10 +3246,10 @@ NIL
 1
 
 SWITCH
-1429
-84
-1550
-117
+21
+835
+142
+868
 Move-Best
 Move-Best
 0
@@ -3209,48 +3257,78 @@ Move-Best
 -1000
 
 SWITCH
-1399
+669
+769
+802
+802
+calc-Moran?
+calc-Moran?
+1
+1
+-1000
+
+SWITCH
+671
+817
+868
+850
+Export-Summary-Data
+Export-Summary-Data
+1
+1
+-1000
+
+SWITCH
+671
+865
+846
+898
+Export-World-Data
+Export-World-Data
+1
+1
+-1000
+
+SWITCH
+672
+914
+813
+947
+Export-Movie
+Export-Movie
+1
+1
+-1000
+
+SLIDER
+12
+583
+184
+616
+SchoolSize
+SchoolSize
+100
+150
+100.0
+10
+1
+NIL
+HORIZONTAL
+
+SLIDER
+17
+67
 189
-1532
-222
-calc-Moran?
-calc-Moran?
-1
-1
--1000
-
-SWITCH
-1401
-237
-1598
-270
-Export-Summary-Data
-Export-Summary-Data
+100
+seed
+seed
 0
-1
--1000
-
-SWITCH
-1401
-285
-1576
-318
-Export-World-Data
-Export-World-Data
+1000
+818.0
 1
 1
--1000
-
-SWITCH
-1402
-334
-1543
-367
-Export-Movie
-Export-Movie
-1
-1
--1000
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
